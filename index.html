@@ -19,6 +19,26 @@
     <title>SkinSavers</title>
   </head>
   <body>
+    <!-- Loading Screen Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+      <div class="loading-content">
+        <div class="medical-icon">
+          <div class="heartbeat-line">
+            <svg viewBox="0 0 600 100" preserveAspectRatio="none">
+              <polyline class="heartbeat" points="0,50 100,50 130,30 160,70 190,50 220,50 250,50 280,30 310,70 340,50 370,50 400,50 430,30 460,70 490,50 520,50 550,50 580,50 600,50" />
+            </svg>
+          </div>
+        </div>
+        <h3 class="loading-text">Processing</h3>
+        <div class="loading-subtext" id="loading-status">Initializing...</div>
+        <div class="progress-container loading-progress">
+          <div class="progress-bar">
+            <div class="progress-fill" id="loading-progress-bar" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <h1 class="logo" text-align="center">skinsavers</h1>
     <h5 class="text">
       Welcome to Skinsavers! This app allows you to quickly self-diagnose
@@ -26,8 +46,8 @@
       even years of your life. All you need to do is input at least one image of
       your skin (multiple is better). Afterward, you will know if you have skin
       cancer or not. If you do, you will quickly receive priceless information
-      such as its type, its progression through different parts of the body, and
-      next steps, such as effective and easy treatment options.
+      such as its type, its progression and stage (estimated), and
+      next steps, such as effective and easy treatment options and simple lifestyle changes.
     </h5>
 
     <div id="image">
