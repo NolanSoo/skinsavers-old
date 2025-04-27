@@ -1,8 +1,7 @@
 // Define variables in global scope
 let model;
-require('dotenv').config();
 let imagePredictions = []; // Array to store predictions from each image
-const GROQ_API_KEY = process.env.API_KEY;
+const GROQ_API_KEY = "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"; // will figure out env variables later
 // Track processed images to prevent duplicates
 const processedImages = new Set();
 // Store selected files
