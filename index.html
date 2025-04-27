@@ -6,20 +6,12 @@
     <link rel="stylesheet" href="styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cal+Sans&family=Comfortaa:wght@600&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Cal+Sans&family=Comfortaa:wght@600&display=swap" rel="stylesheet" />
     <title>SkinSavers</title>
   </head>
   <body>
-    <h1 class="logo" text-align="center">skinsavers</h1>
+    <h1 class="logo">skinsavers</h1>
     <h5 class="text">
       Welcome to Skinsavers! This app allows you to quickly self-diagnose
       yourself for skin cancer, potentially saving you thousands of dollars or
@@ -31,13 +23,10 @@
     </h5>
 
     <div id="image">
-      <!-- Enhanced file upload area -->
       <div class="file-upload-area" id="upload-area">
         <div class="upload-icon">📷</div>
         <div class="upload-text">Click or Drop Skin Images Here</div>
-        <div class="upload-subtext">
-          Supported formats: JPG, JPEG, PNG, GIF, WEBP
-        </div>
+        <div class="upload-subtext">Supported formats: JPG, JPEG, PNG, GIF, WEBP</div>
         <input type="file" id="input-images" multiple accept="image/*" />
         <div class="image-preview-container" id="preview-container"></div>
       </div>
@@ -47,14 +36,9 @@
 
     <div id="output"></div>
     <div id="groq-data" style="display: none"></div>
-    <!-- Invisible div for data transfer -->
 
-    <!-- Load required libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-    <!-- Use the exact CDN URL provided -->
     <script src="https://cdn.jsdelivr.net/npm/groq-sdk@0.20/index.min.js"></script>
-
     <script src="script.js"></script>
   </body>
 </html>
