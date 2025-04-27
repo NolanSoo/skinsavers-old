@@ -6,7 +6,7 @@ Python Documentation:
 - For implementing the densenet121 model we used this code as inspiration (https://www.kaggle.com/code/mathewkouch/ham10000-skin-lesion-classifier-82-pytorch)
 - We reached an accuracy of 79% after 8 hours of training
 JavaScript/Frontend Info:
-- We used basic JavaScript
+- We used plain JavaScript (No Node.js or any extra frameworks)
 - We used several modules: TensorFlow.JS, ONNX Web Runtime, Groq API/SDK (SDK almost always fails so it falls back to the API)
 - Tensorflow.js: Uses the model file (.ONNX) and runs each image through the model
 - ONNX Web Runtime: Allows us to use our ONNX model file (converted from PyTorch) 
