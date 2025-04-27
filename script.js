@@ -6,16 +6,18 @@ const GROQ_API_KEY = "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";
 const processedImages = new Set();
 // Store selected files
 let selectedFiles = [];
-// Class mapping for skin conditions
-const classMapping = {
-  "0": 'pigmented benign keratosis',
-  "1": 'nevus',
-  "2": 'melanoma',
-  "3": 'basal cell carcinoma',
-  "4": 'squamous cell carcinoma',
-  "5":  'vascular lesion',
-  "6": 'dermatofibroma',
-  "7":   'actinic keratosis'
+
+// Mapping from model classes to our disease classes
+// This maps the Teachable Machine class names to our diagnosis mapping classes
+const classNameMapping = {
+  "Class 1": "pigmented benign keratosis",
+  "Class 2": "nevus",
+  "Class 3": "melanoma",
+  "Class 4": "basal cell carcinoma", 
+  "Class 5": "squamous cell carcinoma",
+  "Class 6": "vascular lesion",
+  "Class 7": "dermatofibroma",
+  "Class 8": "actinic keratosis"
 };
 
 // Initialize file upload and preview functionality
@@ -146,6 +148,13 @@ async function loadModel() {
     
     console.log("Model loaded successfully!");
     console.log("Model classes:", model.getClassLabels());
+    
+    // Update our class mapping based on actual model labels if needed
+    const modelLabels = model.getClassLabels();
+    if (modelLabels && modelLabels.length > 0) {
+      console.log("Mapping model labels to our disease classes...");
+    }
+    
     return true;
   } catch (error) {
     console.error("Error loading model:", error);
@@ -185,20 +194,34 @@ async function processImage(inputImage) {
         const resultDiv = document.createElement("div");
         resultDiv.innerHTML = `<b>Prediction for ${inputImage.name}:</b><br>`;
 
+        // Transform predictions to use our disease names
+        const mappedPredictions = predictions.map(pred => {
+          // Map the model's class name to our disease name if possible
+          const mappedClassName = classNameMapping[pred.className] || pred.className;
+          return {
+            originalClassName: pred.className,
+            className: mappedClassName,
+            probability: pred.probability
+          };
+        });
+
+        // Sort predictions by probability (highest first)
+        mappedPredictions.sort((a, b) => b.probability - a.probability);
+
         // Create progress bars for each prediction
-        predictions.forEach((pred) => {
+        mappedPredictions.forEach((pred) => {
           // Round to 1 decimal place
           const probabilityPercentage = (pred.probability * 100).toFixed(1);
           const className = pred.className.toLowerCase().replace(/\s+/g, "-");
 
           // Create a class name for the progress bar
           let colorClass = "";
-          if (className.includes("melanocytic") || className.includes("nevus")) colorClass = "melanocytic";
+          if (className.includes("nevus")) colorClass = "melanocytic";
           else if (className.includes("melanoma")) colorClass = "melanoma";
           else if (className.includes("dermatofib")) colorClass = "dermatofib";
           else if (className.includes("actinic")) colorClass = "actinic";
           else if (className.includes("basal")) colorClass = "basal";
-          else if (className.includes("benign")) colorClass = "benign";
+          else if (className.includes("benign") || className.includes("keratosis")) colorClass = "benign";
           else if (className.includes("vascular")) colorClass = "vascular";
           else if (className.includes("squamous")) colorClass = "melanoma"; // Red for dangerous
           else colorClass = "common"; // Default
@@ -225,7 +248,7 @@ async function processImage(inputImage) {
         // Store predictions for Groq API in a more consistent format
         imagePredictions.push({
           imageName: inputImage.name,
-          predictions: predictions.map(pred => ({
+          predictions: mappedPredictions.map(pred => ({
             className: pred.className,
             probability: (pred.probability * 100).toFixed(1)
           }))
@@ -434,131 +457,4 @@ async function generateCancerAdvice() {
     }
 
     // Remove loading indicator
-    document.getElementById("output").removeChild(loadingDiv);
-
-    console.log("Analysis response received");
-
-    // Trim the response to start with the heading
-    aiResponse = trimResponseToHeading(aiResponse);
-
-    // Format the response with professional styling
-    const formattedResponse = formatProfessionalResponse(aiResponse);
-
-    const resultContainer = document.createElement("div");
-    resultContainer.classList.add("chat-output");
-    resultContainer.innerHTML = formattedResponse;
-    document.getElementById("output").appendChild(resultContainer);
-
-    // Add disclaimer at the bottom
-    const disclaimer = document.createElement("div");
-    disclaimer.className = "disclaimer";
-    disclaimer.innerHTML =
-      "Disclaimer: This analysis is for informational purposes only and does not constitute medical advice. Always consult with a qualified healthcare provider for diagnosis and treatment.";
-    document.getElementById("output").appendChild(disclaimer);
-  } catch (error) {
-    console.error("Error with analysis:", error);
-
-    const errorContainer = document.createElement("div");
-    errorContainer.classList.add("chat-output");
-    errorContainer.style.backgroundColor = "#ffebee";
-    errorContainer.innerHTML = `
-       <h3>Error in Analysis:</h3>
-       <p>Sorry, there was an error processing your request. Please try again later.</p>
-       <p>Error details: ${error.message}</p>
-     `;
-    document.getElementById("output").appendChild(errorContainer);
-  }
-}
-
-// Trim the response to start with the heading
-function trimResponseToHeading(text) {
-  const headingPattern = /Skin Cancer Analysis and Recommendations/i;
-  const match = text.match(headingPattern);
-
-  if (match) {
-    // Return only the text starting from the heading
-    return text.substring(match.index);
-  }
-
-  return text; // Return original if heading not found
-}
-
-// Format the response in a professional, clinical manner
-function formatProfessionalResponse(text) {
-  // Replace the main heading with a styled heading
-  text = text.replace(
-    /Skin Cancer Analysis and Recommendations/i,
-    '<h1 class="analysis-header">Skin Cancer Analysis and Recommendations</h1>'
-  );
-
-  // Replace section headers with styled headers
-  text = text.replace(
-    /1\.\s+TREATMENT OPTIONS AND ADVICE:/gi,
-    '<div class="analysis-section"><h2>1. Treatment Options and Advice</h2>'
-  );
-  text = text.replace(
-    /2\.\s+CANCER SPREAD PREDICTION:/gi,
-    '</div><div class="analysis-section"><h2>2. Cancer Spread Prediction</h2>'
-  );
-  text = text.replace(
-    /3\.\s+CANCER PROGRESSION ASSESSMENT:/gi,
-    '</div><div class="analysis-section"><h2>3. Cancer Progression Assessment</h2>'
-  );
-
-  // Add closing div for the last section
-  text += "</div>";
-
-  // Format bullet points
-  text = text.replace(/- /g, "<li>");
-  text = text.replace(/\n- /g, "</li>\n<li>");
-  text = text.replace(/<li>(.*?)(?=<\/li>|$)/gs, "<li>$1</li>");
-
-  // Wrap bullet point sections in ul tags
-  text = text.replace(/(<li>.*?<\/li>)/gs, "<ul>$1</ul>");
-
-  // Format conclusion if present
-  text = text.replace(
-    /Conclusion:(.*?)(?=<div|$)/gs,
-    '<div class="conclusion"><strong>Conclusion:</strong>$1</div>'
-  );
-
-  // Replace any remaining # symbols in headings
-  text = text.replace(
-    /#{1,6}\s+(.*?)(?=\n|$)/g,
-    '<div class="subheading">$1</div>'
-  );
-
-  // Bold important terms and subheadings
-  text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-
-  // Format paragraphs
-  text = text.replace(/\n\n/g, "</p><p>");
-
-  return text;
-}
-
-// Load the model when the page is ready
-window.onload = async () => {
-  console.log("Page loaded, loading model...");
-  
-  // Create groq-data div if it doesn't exist
-  if (!document.getElementById("groq-data")) {
-    const dataDiv = document.createElement("div");
-    dataDiv.id = "groq-data";
-    dataDiv.style.display = "none";
-    document.body.appendChild(dataDiv);
-  }
-  
-  // Load the model
-  await loadModel();
-  
-  // Check for Groq SDK
-  console.log("Checking Groq SDK availability...");
-  if (typeof Groq === "undefined") {
-    console.warn("Groq SDK not detected. Will use direct API calls.");
-  } else {
-    console.log("Groq SDK loaded successfully.");
-  }
-  
-  console.log("Initialization complete!");
-};
+    document.getElementById("output").removeChild(loading
