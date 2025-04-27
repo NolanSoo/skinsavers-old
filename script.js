@@ -302,6 +302,8 @@ async function generateCancerAdvice() {
      Exact progression of your cancer
      Although data is difficult to receive on the exact stages of melanoma and other types of cancer (Stages 1-5), this app will be able to see how far your cancer has progressed in various areas based on the AI model’s confidence. If it is 100 percent sure your skin has cancer, then it has almost certainly progressed much more than if it is 10% sure. It will also be able to tell if the cancer is malignant or benign. You can also take pictures of your skin consistently, which will allow you to measure your progression more clearly and get an even better picture of your current position. 
 
+    Rough Prediction of Stage/Progression of Cancer
+    Attempt to use the data provided, including confidence percentages in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potiential life altering decisions, and should only be used for casual advice."
      IMPORTANT INSTRUCTIONS:
      1. Start your response with the heading "Skin Cancer Analysis and Recommendations"
      2. Refer to yourself as "assistant" not "AI"
