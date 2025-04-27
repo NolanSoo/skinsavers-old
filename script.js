@@ -6,6 +6,8 @@ const GROQ_API_KEY = "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";
 const processedImages = new Set();
 // Store selected files
 let selectedFiles = [];
+// Store class mappings
+let classMapping = {};
 
 // Initialize file upload and preview functionality
 document.addEventListener("DOMContentLoaded", function () {
@@ -116,23 +118,35 @@ window.skinsave = async function () {
   generateCancerAdvice();
 };
 
-// Load the model from Teachable Machine directly
+// Load the custom model from the local repository
 async function loadModel() {
-  const modelURL =
-    "https://teachablemachine.withgoogle.com/models/6WAstz5bw/model.json";
-  const metadataURL =
-    "https://teachablemachine.withgoogle.com/models/6WAstz5bw/metadata.json";
-
+  const modelURL = "model.json"; // Path to your model.json file
+  
   console.log("Loading model from:", modelURL);
-  console.log("Loading metadata from:", metadataURL);
-
+  
   try {
-    model = await tmImage.load(modelURL, metadataURL);
+    // Load class mapping from class_mapping.json
+    const mappingResponse = await fetch("class_mapping.json");
+    if (!mappingResponse.ok) {
+      throw new Error(`Failed to load class mapping: ${mappingResponse.status}`);
+    }
+    classMapping = await mappingResponse.json();
+    console.log("Class mapping loaded:", classMapping);
+    
+    // Load the model
+    model = await tf.loadGraphModel(modelURL);
     console.log("Model loaded successfully.");
   } catch (error) {
-    console.error("Error loading model:", error);
+    console.error("Error loading model or class mapping:", error);
     alert("There was an error loading the model. Please try again later.");
   }
+}
+
+// Function to determine if a condition is cancerous
+function isCancer(conditionName) {
+  const cancerIndicators = ['melanoma', 'carcinoma', 'cancer', 'malignant'];
+  const conditionLower = conditionName.toLowerCase();
+  return cancerIndicators.some(indicator => conditionLower.includes(indicator));
 }
 
 // Function to process each image and display predictions
@@ -157,38 +171,57 @@ async function processImage(inputImage) {
   return new Promise((resolve) => {
     imageElement.onload = async () => {
       console.log("Image loaded:", inputImage.name);
-      const imageTensor = preprocessImage(imageElement);
-
+      
       try {
-        const predictions = await model.predict(imageElement);
-        console.log("Predictions for", inputImage.name, ":", predictions);
+        // Preprocess the image
+        const imageTensor = preprocessImage(imageElement);
+        
+        // Make prediction
+        const prediction = await model.predict(imageTensor);
+        const probabilities = await prediction.softmax().data();
+        
+        console.log("Raw probabilities:", probabilities);
+        
+        // Convert to array of predictions with class names
+        const formattedPredictions = [];
+        for (let i = 0; i < probabilities.length; i++) {
+          const className = classMapping[i] || `Class ${i}`;
+          const isCancerous = isCancer(className);
+          
+          formattedPredictions.push({
+            className: className,
+            probability: probabilities[i],
+            isCancer: isCancerous
+          });
+        }
+        
+        // Sort by probability (highest first)
+        formattedPredictions.sort((a, b) => b.probability - a.probability);
+        
+        console.log("Predictions for", inputImage.name, ":", formattedPredictions);
 
         const resultDiv = document.createElement("div");
         resultDiv.innerHTML = `<b>Prediction for ${inputImage.name}:</b><br>`;
 
-        // Create progress bars for each prediction
-        predictions.forEach((pred) => {
-          // Round to 1 decimal place instead of 4
+        // Create progress bars for each prediction (showing top 5)
+        formattedPredictions.slice(0, 5).forEach((pred) => {
+          // Round to 1 decimal place
           const probabilityPercentage = (pred.probability * 100).toFixed(1);
           const className = pred.className.toLowerCase().replace(/\s+/g, "-");
 
           // Create a class name for the progress bar
           let colorClass = "";
-          if (className.includes("melanocytic")) colorClass = "melanocytic";
-          else if (className.includes("melanoma")) colorClass = "melanoma";
-          else if (className.includes("dermatofib")) colorClass = "dermatofib";
-          else if (className.includes("actinic")) colorClass = "actinic";
-          else if (className.includes("basal")) colorClass = "basal";
-          else if (className.includes("benign")) colorClass = "benign";
-          else if (className.includes("vascular")) colorClass = "vascular";
-          else if (className.includes("common")) colorClass = "common";
-          else colorClass = "common"; // Default
+          if (pred.isCancer) {
+            colorClass = "melanoma"; // Use red for cancerous conditions
+          } else {
+            colorClass = "benign"; // Use green for benign conditions
+          }
 
           // Create progress bar HTML
           const progressHTML = `
              <div class="progress-container">
                <div class="progress-label">
-                 <span>${pred.className}</span>
+                 <span>${pred.className} ${pred.isCancer ? '(CANCER)' : '(benign)'}</span>
                  <span>${probabilityPercentage}%</span>
                </div>
                <div class="progress-bar">
@@ -203,12 +236,30 @@ async function processImage(inputImage) {
           resultDiv.innerHTML += progressHTML;
         });
 
+        // Calculate overall cancer risk
+        const cancerRisk = formattedPredictions
+          .filter(pred => pred.isCancer)
+          .reduce((sum, pred) => sum + pred.probability, 0) * 100;
+          
+        resultDiv.innerHTML += `
+          <div class="cancer-risk">
+            <strong>Overall Cancer Risk: ${cancerRisk.toFixed(1)}%</strong>
+          </div>
+        `;
+
         imagePredictions.push({
           imageName: inputImage.name,
-          predictions,
+          predictions: formattedPredictions,
+          cancerRisk: cancerRisk
         });
+        
         resultContainer.appendChild(resultDiv);
         document.getElementById("output").appendChild(resultContainer);
+        
+        // Clean up the tensor to free memory
+        tf.dispose(imageTensor);
+        tf.dispose(prediction);
+        
         resolve();
       } catch (error) {
         console.error("Error predicting image:", error);
@@ -220,10 +271,30 @@ async function processImage(inputImage) {
 
 // Preprocess image before making predictions
 function preprocessImage(imageElement) {
+  // Convert the image to a tensor
   const image = tf.browser.fromPixels(imageElement);
+  
+  // Resize to 224x224 (the size used by many models)
   const resizedImage = tf.image.resizeBilinear(image, [224, 224]);
+  
+  // Normalize the values to be between 0 and 1
   const normalizedImage = resizedImage.div(tf.scalar(255.0));
-  const batchedImage = normalizedImage.expandDims(0);
+  
+  // Normalize using the specific mean and std values for ImageNet
+  // This matches the Python normalization:
+  // transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+  const meanImageNet = tf.tensor([0.485, 0.456, 0.406]);
+  const stdImageNet = tf.tensor([0.229, 0.224, 0.225]);
+  
+  const normalizedImageNet = normalizedImage.sub(meanImageNet).div(stdImageNet);
+  
+  // Add batch dimension [1, 224, 224, 3]
+  const batchedImage = normalizedImageNet.expandDims(0);
+  
+  // If model expects channels first format [1, 3, 224, 224], transpose
+  // const transposedImage = batchedImage.transpose([0, 3, 1, 2]);
+  
+  // Return the processed tensor (use transposedImage if needed)
   return batchedImage;
 }
 
@@ -297,10 +368,10 @@ async function generateCancerAdvice() {
      This app will use an AI chatbot in order to give advice. For instance, it could tell you which doctor to go to for your specific cancer and for the cheapest price depending on your insurance. It can also tell you which possible outcomes are the most dangerous, as well as lifestyle changes that will help decrease the progression rate of your cancer. 
 
      Prediction of where cancer will spread next
-     By getting information on multiple parts of the skin, this app will allow for a world-class analysis of where the cancer might spread next. For instance, if one area is predicted with 100% confidence to be cancerous, and the other areas have 66% and 36%, for example, it can give you advice on where it will spread and where it may metastasize to. This advice will help you get the correct treatment the first time without a long sequence of expensive doctors’ visits and appointments. 
+     By getting information on multiple parts of the skin, this app will allow for a world-class analysis of where the cancer might spread next. For instance, if one area is predicted with 100% confidence to be cancerous, and the other areas have 66% and 36%, for example, it can give you advice on where it will spread and where it may metastasize to. This advice will help you get the correct treatment the first time without a long sequence of expensive doctors' visits and appointments. 
 
      Exact progression of your cancer
-     Although data is difficult to receive on the exact stages of melanoma and other types of cancer (Stages 1-5), this app will be able to see how far your cancer has progressed in various areas based on the AI model’s confidence. If it is 100 percent sure your skin has cancer, then it has almost certainly progressed much more than if it is 10% sure. It will also be able to tell if the cancer is malignant or benign. You can also take pictures of your skin consistently, which will allow you to measure your progression more clearly and get an even better picture of your current position. 
+     Although data is difficult to receive on the exact stages of melanoma and other types of cancer (Stages 1-5), this app will be able to see how far your cancer has progressed in various areas based on the AI model's confidence. If it is 100 percent sure your skin has cancer, then it has almost certainly progressed much more than if it is 10% sure. It will also be able to tell if the cancer is malignant or benign. You can also take pictures of your skin consistently, which will allow you to measure your progression more clearly and get an even better picture of your current position. 
 
     Rough Prediction of Stage/Progression of Cancer
     Attempt to use the data provided, including confidence percentages in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potiential life altering decisions, and should only be used for casual advice."
