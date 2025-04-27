@@ -28,6 +28,96 @@ h1 {
   max-width: 800px;
 }
 
+/* Loading Screen Styles */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.loading-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.loading-content {
+  text-align: center;
+  padding: 30px;
+  border-radius: 10px;
+  background-color: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+  width: 90%;
+  border: 1px solid #e0f2e0;
+}
+
+.loading-text {
+  color: #2e7d32;
+  font-size: 24px;
+  margin: 15px 0 5px;
+  font-family: "Cal Sans", sans-serif;
+}
+
+.loading-subtext {
+  color: #757575;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.loading-progress {
+  margin: 20px 0;
+}
+
+.loading-progress .progress-fill {
+  background-color: #4caf50;
+  transition: width 0.5s ease;
+}
+
+/* Medical Icon and Heartbeat Animation */
+.medical-icon {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 15px;
+  position: relative;
+}
+
+.heartbeat-line {
+  width: 100%;
+  height: 50px;
+  position: relative;
+  overflow: hidden;
+}
+
+.heartbeat {
+  fill: none;
+  stroke: #4caf50;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: dash 3s linear infinite;
+}
+
+@keyframes dash {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 /* Enhanced file input area */
 .file-upload-area {
   position: relative;
@@ -293,4 +383,23 @@ h1 {
   margin-top: 15px;
   margin-bottom: 10px;
   font-weight: bold;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .result-container {
+    width: 100%;
+  }
+  
+  body {
+    padding: 20px;
+  }
+  
+  h1 {
+    font-size: 48px;
+  }
+  
+  .loading-content {
+    padding: 20px;
+  }
 }
