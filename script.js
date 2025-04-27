@@ -165,10 +165,10 @@ window.skinsave = async function () {
 // Load the model
 async function loadModel() {
   try {
-    console.log("Loading model from local tfjs_model/model.json");
+    console.log("Loading model from local model.json/");
     
     // Use tf.loadLayersModel to load the local model
-    model = await tf.loadLayersModel('./tfjs_model/model.json');
+    model = await tf.loadLayersModel('model.json');
     
     console.log("Model loaded successfully!");
     
@@ -180,7 +180,7 @@ async function loadModel() {
     console.error("Error loading local model:", error);
     
     // Show a detailed error about the model loading failure
-    alert(`Error loading model: ${error.message}. Please make sure you have a model.json file in the tfjs_model folder.`);
+    alert(`Error loading model: ${error.message}. Please make sure you have a model.json file`);
     return false;
   }
 }
