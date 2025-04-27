@@ -7,17 +7,17 @@ const processedImages = new Set();
 // Store selected files
 let selectedFiles = [];
 
-// Mapping from model classes to our disease classes
-// This maps the Teachable Machine class names to our diagnosis mapping classes
+// Mapping from actual model output classes to our standardized disease names
 const classNameMapping = {
-  "Class 1": "pigmented benign keratosis",
-  "Class 2": "nevus",
-  "Class 3": "melanoma",
-  "Class 4": "basal cell carcinoma", 
-  "Class 5": "squamous cell carcinoma",
-  "Class 6": "vascular lesion",
-  "Class 7": "dermatofibroma",
-  "Class 8": "actinic keratosis"
+  "Actinic keratoses and intraepithelial carcinoma /": "actinic keratosis",
+  "dermatofib": "dermatofibroma",
+  "vascular lesions": "vascular lesion",
+  "common-uncancerous": "pigmented benign keratosis",
+  "melanocytic nevi": "nevus",
+  "basal cell carcinoma": "basal cell carcinoma",
+  "melanoma": "melanoma",
+  "benign keratosis-like lesions": "pigmented benign keratosis",
+  "squamous cell carcinoma": "squamous cell carcinoma"
 };
 
 // Initialize file upload and preview functionality
@@ -176,12 +176,25 @@ async function loadModel() {
     );
     
     console.log("Model loaded successfully!");
-    console.log("Model classes:", model.getClassLabels());
+    
+    // Log the actual class labels from the model
+    const modelLabels = model.getClassLabels();
+    console.log("Model classes:", modelLabels);
     
     // Update our class mapping based on actual model labels if needed
-    const modelLabels = model.getClassLabels();
     if (modelLabels && modelLabels.length > 0) {
-      console.log("Mapping model labels to our disease classes...");
+      console.log("Using model's actual class labels for mapping");
+      
+      // Log the first few predictions to understand the format
+      const testImg = document.createElement('img');
+      testImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+      document.body.appendChild(testImg);
+      testImg.style.display = 'none';
+      
+      // No need to make actual predictions, just checking the class format
+      testImg.onload = () => {
+        document.body.removeChild(testImg);
+      };
     }
     
     return true;
@@ -223,13 +236,14 @@ async function processImage(inputImage) {
         const resultDiv = document.createElement("div");
         resultDiv.innerHTML = `<b>Prediction for ${inputImage.name}:</b><br>`;
 
-        // Transform predictions to use our disease names
+        // Keep the original predictions but add mapped names for the API
         const mappedPredictions = predictions.map(pred => {
-          // Map the model's class name to our disease name if possible
+          // Use the class name as is for display, but add mapped name for consistency
           const mappedClassName = classNameMapping[pred.className] || pred.className;
           return {
             originalClassName: pred.className,
-            className: mappedClassName,
+            className: mappedClassName, // Store standardized name
+            displayName: pred.className, // Keep original for display
             probability: pred.probability
           };
         });
@@ -241,16 +255,16 @@ async function processImage(inputImage) {
         mappedPredictions.forEach((pred) => {
           // Round to 1 decimal place
           const probabilityPercentage = (pred.probability * 100).toFixed(1);
-          const className = pred.className.toLowerCase().replace(/\s+/g, "-");
+          const className = pred.displayName.toLowerCase().replace(/\s+/g, "-");
 
           // Create a class name for the progress bar
           let colorClass = "";
-          if (className.includes("nevus")) colorClass = "melanocytic";
+          if (className.includes("nevi") || className.includes("melanocytic")) colorClass = "melanocytic";
           else if (className.includes("melanoma")) colorClass = "melanoma";
           else if (className.includes("dermatofib")) colorClass = "dermatofib";
           else if (className.includes("actinic")) colorClass = "actinic";
           else if (className.includes("basal")) colorClass = "basal";
-          else if (className.includes("benign") || className.includes("keratosis")) colorClass = "benign";
+          else if (className.includes("benign") || className.includes("keratosis") || className.includes("uncancerous")) colorClass = "benign";
           else if (className.includes("vascular")) colorClass = "vascular";
           else if (className.includes("squamous")) colorClass = "melanoma"; // Red for dangerous
           else colorClass = "common"; // Default
@@ -259,7 +273,7 @@ async function processImage(inputImage) {
           const progressHTML = `
              <div class="progress-container">
                <div class="progress-label">
-                 <span>${pred.className}</span>
+                 <span>${pred.displayName}</span>
                  <span>${probabilityPercentage}%</span>
                </div>
                <div class="progress-bar">
@@ -274,11 +288,12 @@ async function processImage(inputImage) {
           resultDiv.innerHTML += progressHTML;
         });
 
-        // Store predictions for Groq API in a more consistent format
+        // Store predictions for Groq API in a more consistent format using mapped class names
         imagePredictions.push({
           imageName: inputImage.name,
           predictions: mappedPredictions.map(pred => ({
-            className: pred.className,
+            className: pred.className, // Use standardized name for API
+            originalClassName: pred.displayName, // Include original name for reference
             probability: (pred.probability * 100).toFixed(1)
           }))
         });
