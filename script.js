@@ -1,5 +1,6 @@
 // Define variables in global scope
 let model;
+let session; // ONNX Session
 let imagePredictions = []; // Array to store predictions from each image
 const GROQ_API_KEY = "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"; // will figure out env variables later
 // Track processed images to prevent duplicates
@@ -86,9 +87,72 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
+// Load the ONNX model
+async function loadModel() {
+  try {
+    // Load class mapping from class_mapping.json
+    const mappingResponse = await fetch("class_mapping.json");
+    if (!mappingResponse.ok) {
+      throw new Error(`Failed to load class mapping: ${mappingResponse.status}`);
+    }
+    classMapping = await mappingResponse.json();
+    console.log("Class mapping loaded:", classMapping);
+    
+    // Create ONNX session
+    console.log("Loading ONNX model...");
+    session = new onnx.InferenceSession();
+    
+    // Load the model
+    await session.loadModel("skin_cancer_model.onnx");
+    console.log("ONNX model loaded successfully");
+  } catch (error) {
+    console.error("Error loading model or class mapping:", error);
+    alert("There was an error loading the model. Please try again later.");
+  }
+}
+
+// Function to determine if a condition is cancerous
+function isCancer(conditionName) {
+  const cancerIndicators = ['melanoma', 'carcinoma', 'cancer', 'malignant'];
+  const conditionLower = conditionName.toLowerCase();
+  return cancerIndicators.some(indicator => conditionLower.includes(indicator));
+}
+
+// Preprocess image for ONNX model
+async function preprocessImage(imageElement) {
+  // Convert the image to a tensor using TensorFlow.js temporarily
+  const image = tf.browser.fromPixels(imageElement);
+  
+  // Resize to 224x224 (the size used by the model)
+  const resizedImage = tf.image.resizeBilinear(image, [224, 224]);
+  
+  // Normalize the values to be between 0 and 1
+  const normalizedImage = resizedImage.div(tf.scalar(255.0));
+  
+  // Normalize using the specific mean and std values for ImageNet
+  // This matches the Python normalization:
+  // transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+  const meanImageNet = tf.tensor([0.485, 0.456, 0.406]);
+  const stdImageNet = tf.tensor([0.229, 0.224, 0.225]);
+  
+  const normalizedImageNet = normalizedImage.sub(meanImageNet).div(stdImageNet);
+  
+  // Get the data in the correct format for ONNX
+  // Convert from NHWC to NCHW format (batch, channels, height, width)
+  const transposedImage = normalizedImageNet.transpose([2, 0, 1]).expandDims(0);
+  
+  // Convert to Float32Array for ONNX
+  const imageData = await transposedImage.data();
+  
+  // Clean up tensors
+  tf.dispose([image, resizedImage, normalizedImage, normalizedImageNet, transposedImage]);
+  
+  return new Float32Array(imageData);
+}
+
 // Main function to process skin images
 window.skinsave = async function () {
-  if (!model) {
+  if (!session) {
     alert("Model is still loading, please wait.");
     return;
   }
@@ -118,37 +182,6 @@ window.skinsave = async function () {
   generateCancerAdvice();
 };
 
-// Load the custom model from the local repository
-async function loadModel() {
-  const modelURL = "model.json"; // Path to your model.json file
-  
-  console.log("Loading model from:", modelURL);
-  
-  try {
-    // Load class mapping from class_mapping.json
-    const mappingResponse = await fetch("class_mapping.json");
-    if (!mappingResponse.ok) {
-      throw new Error(`Failed to load class mapping: ${mappingResponse.status}`);
-    }
-    classMapping = await mappingResponse.json();
-    console.log("Class mapping loaded:", classMapping);
-    
-    // Load the model
-    model = await tf.loadGraphModel(modelURL);
-    console.log("Model loaded successfully.");
-  } catch (error) {
-    console.error("Error loading model or class mapping:", error);
-    alert("There was an error loading the model. Please try again later.");
-  }
-}
-
-// Function to determine if a condition is cancerous
-function isCancer(conditionName) {
-  const cancerIndicators = ['melanoma', 'carcinoma', 'cancer', 'malignant'];
-  const conditionLower = conditionName.toLowerCase();
-  return cancerIndicators.some(indicator => conditionLower.includes(indicator));
-}
-
 // Function to process each image and display predictions
 async function processImage(inputImage) {
   // Check if this image has already been processed (using name as identifier)
@@ -173,24 +206,36 @@ async function processImage(inputImage) {
       console.log("Image loaded:", inputImage.name);
       
       try {
-        // Preprocess the image
-        const imageTensor = preprocessImage(imageElement);
+        // Preprocess the image for ONNX
+        const imageData = await preprocessImage(imageElement);
         
-        // Make prediction
-        const prediction = await model.predict(imageTensor);
-        const probabilities = await prediction.softmax().data();
+        // Create ONNX tensor
+        const inputTensor = new onnx.Tensor(imageData, 'float32', [1, 3, 224, 224]);
         
-        console.log("Raw probabilities:", probabilities);
+        // Create the feeds object for ONNX
+        const feeds = { input: inputTensor };
+        
+        // Run inference
+        const outputMap = await session.run(feeds);
+        
+        // Get output data - the first (and likely only) output tensor
+        const outputTensor = outputMap[Object.keys(outputMap)[0]];
+        const outputData = outputTensor.data;
+        
+        // Apply softmax to convert logits to probabilities
+        const softmaxData = softmax(Array.from(outputData));
+        
+        console.log("Raw probabilities:", softmaxData);
         
         // Convert to array of predictions with class names
         const formattedPredictions = [];
-        for (let i = 0; i < probabilities.length; i++) {
+        for (let i = 0; i < softmaxData.length; i++) {
           const className = classMapping[i] || `Class ${i}`;
           const isCancerous = isCancer(className);
           
           formattedPredictions.push({
             className: className,
-            probability: probabilities[i],
+            probability: softmaxData[i],
             isCancer: isCancerous
           });
         }
@@ -256,46 +301,27 @@ async function processImage(inputImage) {
         resultContainer.appendChild(resultDiv);
         document.getElementById("output").appendChild(resultContainer);
         
-        // Clean up the tensor to free memory
-        tf.dispose(imageTensor);
-        tf.dispose(prediction);
-        
         resolve();
       } catch (error) {
         console.error("Error predicting image:", error);
+        resultContainer.innerHTML += `
+          <div class="error-message">
+            <p>Error processing this image: ${error.message}</p>
+          </div>
+        `;
+        document.getElementById("output").appendChild(resultContainer);
         resolve();
       }
     };
   });
 }
 
-// Preprocess image before making predictions
-function preprocessImage(imageElement) {
-  // Convert the image to a tensor
-  const image = tf.browser.fromPixels(imageElement);
-  
-  // Resize to 224x224 (the size used by many models)
-  const resizedImage = tf.image.resizeBilinear(image, [224, 224]);
-  
-  // Normalize the values to be between 0 and 1
-  const normalizedImage = resizedImage.div(tf.scalar(255.0));
-  
-  // Normalize using the specific mean and std values for ImageNet
-  // This matches the Python normalization:
-  // transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-  const meanImageNet = tf.tensor([0.485, 0.456, 0.406]);
-  const stdImageNet = tf.tensor([0.229, 0.224, 0.225]);
-  
-  const normalizedImageNet = normalizedImage.sub(meanImageNet).div(stdImageNet);
-  
-  // Add batch dimension [1, 224, 224, 3]
-  const batchedImage = normalizedImageNet.expandDims(0);
-  
-  // If model expects channels first format [1, 3, 224, 224], transpose
-  // const transposedImage = batchedImage.transpose([0, 3, 1, 2]);
-  
-  // Return the processed tensor (use transposedImage if needed)
-  return batchedImage;
+// Softmax function for converting raw model output to probabilities
+function softmax(arr) {
+  const max = Math.max(...arr);
+  const exps = arr.map(x => Math.exp(x - max));
+  const sumExps = exps.reduce((acc, curr) => acc + curr, 0);
+  return exps.map(exp => exp / sumExps);
 }
 
 // Direct API call to Groq (fallback method)
