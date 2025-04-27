@@ -9,6 +9,40 @@ let selectedFiles = [];
 // Store class mappings
 let classMapping = {};
 
+// Loading screen functions
+function showLoadingScreen(message = "Initializing...") {
+  const loadingOverlay = document.getElementById("loading-overlay");
+  const loadingStatus = document.getElementById("loading-status");
+  const progressBar = document.getElementById("loading-progress-bar");
+  
+  // Reset progress bar
+  progressBar.style.width = "0%";
+  
+  // Set initial message
+  loadingStatus.textContent = message;
+  
+  // Show the overlay
+  loadingOverlay.classList.add("active");
+}
+
+function updateLoadingProgress(percent, message = null) {
+  const progressBar = document.getElementById("loading-progress-bar");
+  const loadingStatus = document.getElementById("loading-status");
+  
+  // Update progress bar
+  progressBar.style.width = `${percent}%`;
+  
+  // Update message if provided
+  if (message) {
+    loadingStatus.textContent = message;
+  }
+}
+
+function hideLoadingScreen() {
+  const loadingOverlay = document.getElementById("loading-overlay");
+  loadingOverlay.classList.remove("active");
+}
+
 // Initialize file upload and preview functionality
 document.addEventListener("DOMContentLoaded", function () {
   const inputElement = document.getElementById("input-images");
@@ -89,6 +123,9 @@ document.addEventListener("DOMContentLoaded", function () {
 // Load the ONNX model
 async function loadModel() {
   try {
+    showLoadingScreen("Loading model resources...");
+    updateLoadingProgress(10, "Loading class mapping...");
+    
     // Load class mapping from class_mapping.json
     const mappingResponse = await fetch("class_mapping.json");
     if (!mappingResponse.ok) {
@@ -96,6 +133,8 @@ async function loadModel() {
     }
     classMapping = await mappingResponse.json();
     console.log("Class mapping loaded:", classMapping);
+    
+    updateLoadingProgress(30, "Initializing ONNX runtime...");
     
     // Set ONNX WebAssembly path and other options
     const ort = window.ort;
@@ -106,6 +145,8 @@ async function loadModel() {
       'ort-wasm-simd-threaded.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm'
     };
     
+    updateLoadingProgress(50, "Setting up model session...");
+    
     // Create ONNX session options
     const sessionOptions = {
       executionProviders: ['wasm'],
@@ -114,11 +155,26 @@ async function loadModel() {
     
     // Create ONNX session
     console.log("Loading ONNX model...");
+    updateLoadingProgress(70, "Loading skin cancer model...");
     session = await ort.InferenceSession.create('skin_cancer_model.onnx', sessionOptions);
+    
+    updateLoadingProgress(90, "Finalizing setup...");
     console.log("ONNX model loaded successfully");
+    
+    // Small delay to show completion
+    setTimeout(() => {
+      updateLoadingProgress(100, "Ready!");
+      setTimeout(() => {
+        hideLoadingScreen();
+      }, 500);
+    }, 500);
   } catch (error) {
     console.error("Error loading model or class mapping:", error);
-    alert("There was an error loading the model. Please try again later.");
+    updateLoadingProgress(100, `Error: ${error.message}`);
+    setTimeout(() => {
+      hideLoadingScreen();
+      alert("There was an error loading the model. Please try again later.");
+    }, 1000);
   }
 }
 
@@ -173,6 +229,9 @@ window.skinsave = async function () {
     return;
   }
 
+  showLoadingScreen("Preparing for analysis...");
+  updateLoadingProgress(10);
+  
   console.log("Processing images...");
   // Clear previous output and reset predictions
   document.getElementById("output").innerHTML = "";
@@ -181,7 +240,11 @@ window.skinsave = async function () {
   processedImages.clear();
 
   // Process each selected image
-  for (const inputImage of selectedFiles) {
+  const totalImages = selectedFiles.length;
+  for (let i = 0; i < totalImages; i++) {
+    const inputImage = selectedFiles[i];
+    const progressPercent = 10 + Math.round((i / totalImages) * 60); // Progress from 10% to 70%
+    updateLoadingProgress(progressPercent, `Analyzing image ${i+1} of ${totalImages}: ${inputImage.name}`);
     console.log("Processing image:", inputImage.name);
     await processImage(inputImage);
   }
@@ -189,8 +252,15 @@ window.skinsave = async function () {
   // After processing images, store predictions in the invisible div
   document.getElementById("groq-data").textContent =
     JSON.stringify(imagePredictions);
+    
+  // Update loading status for AI analysis
+  updateLoadingProgress(70, "Generating comprehensive analysis...");
+  
   // Trigger Groq AI function
-  generateCancerAdvice();
+  await generateCancerAdvice();
+  
+  // Hide loading screen when everything is complete
+  hideLoadingScreen();
 };
 
 // Function to process each image and display predictions
@@ -440,12 +510,8 @@ async function generateCancerAdvice() {
   ];
 
   try {
-    // Create a loading indicator
-    const loadingDiv = document.createElement("div");
-    loadingDiv.classList.add("chat-output");
-    loadingDiv.innerHTML =
-      "<h3>Generating Analysis...</h3><p>Please wait while our medical assistant analyzes your skin images...</p>";
-    document.getElementById("output").appendChild(loadingDiv);
+    // Update loading progress for AI analysis
+    updateLoadingProgress(80, "Generating medical analysis...");
 
     console.log("Sending prompt to Groq...");
 
@@ -477,13 +543,14 @@ async function generateCancerAdvice() {
         sdkError
       );
 
+      updateLoadingProgress(85, "Processing analysis results...");
+      
       // Fallback to direct API call
       const apiResponse = await callGroqAPI(messages);
       aiResponse = apiResponse.choices[0].message.content;
     }
 
-    // Remove loading indicator
-    document.getElementById("output").removeChild(loadingDiv);
+    updateLoadingProgress(95, "Formatting results...");
 
     console.log("Analysis response received");
 
@@ -504,8 +571,12 @@ async function generateCancerAdvice() {
     disclaimer.innerHTML =
       "Disclaimer: This analysis is for informational purposes only and does not constitute medical advice. Always consult with a qualified healthcare provider for diagnosis and treatment.";
     document.getElementById("output").appendChild(disclaimer);
+    
+    updateLoadingProgress(100, "Analysis complete!");
   } catch (error) {
     console.error("Error with analysis:", error);
+
+    updateLoadingProgress(100, "Error generating analysis");
 
     const errorContainer = document.createElement("div");
     errorContainer.classList.add("chat-output");
