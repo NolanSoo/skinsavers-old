@@ -7,19 +7,17 @@ const processedImages = new Set();
 // Store selected files
 let selectedFiles = [];
 
-// Mapping from actual model output classes to simplified display names
-// Keep this exact case and format as shown in your example
-const classNameMapping = {
-  "melanocytic nevi": "melanocytic nevi",
-  "melanoma": "melanoma",
-  "Actinic keratoses and intraepithelial carcinoma /": "Actinic keratoses and intraepithelial carcinoma /",
-  "vascular lesions": "vascular lesions",
-  "dermatofib": "dermatofib",
-  "basal cell carcinoma": "basal cell carcinoma",
-  "common-uncancerous": "common-uncancerous",
-  "benign keratosis-like lesions": "benign keratosis-like lesions",
-  "squamous cell carcinoma": "squamous cell carcinoma"
-};
+// These are the exact class names from your PyTorch model based on diagnosis_mapping
+const CLASS_NAMES = [
+  "pigmented benign keratosis",
+  "nevus",
+  "melanoma",
+  "basal cell carcinoma",
+  "squamous cell carcinoma",
+  "vascular lesion",
+  "dermatofibroma",
+  "actinic keratosis"
+];
 
 // Initialize file upload and preview functionality
 document.addEventListener("DOMContentLoaded", function () {
@@ -164,25 +162,25 @@ window.skinsave = async function () {
   generateCancerAdvice();
 };
 
-// Load the model from Teachable Machine
+// Load the model
 async function loadModel() {
   try {
-    const modelURL = "https://teachablemachine.withgoogle.com/models/6WAstz5bw/";
-    console.log("Loading model from:", modelURL);
+    console.log("Loading model from local tfjs_model/model.json");
     
-    // Initialize the model
-    model = await tmImage.load(
-      modelURL + 'model.json',
-      modelURL + 'metadata.json'
-    );
+    // Use tf.loadLayersModel to load the local model
+    model = await tf.loadLayersModel('./tfjs_model/model.json');
     
     console.log("Model loaded successfully!");
-    console.log("Model classes:", model.getClassLabels());
+    
+    // Get model details
+    console.log("Model summary:", model.summary());
     
     return true;
   } catch (error) {
-    console.error("Error loading model:", error);
-    alert("There was an error loading the model. Please try again later.");
+    console.error("Error loading local model:", error);
+    
+    // Show a detailed error about the model loading failure
+    alert(`Error loading model: ${error.message}. Please make sure you have a model.json file in the tfjs_model folder.`);
     return false;
   }
 }
@@ -211,15 +209,37 @@ async function processImage(inputImage) {
       console.log("Image loaded:", inputImage.name);
       
       try {
-        // Use Teachable Machine's predict method which requires an HTML image element
-        const predictions = await model.predict(imageElement);
-        console.log("Raw predictions for", inputImage.name, ":", predictions);
+        // Preprocess the image to match PyTorch model's expected input
+        const tensor = tf.browser.fromPixels(imageElement)
+          .resizeNearestNeighbor([224, 224]) // Resize to match model input
+          .toFloat()
+          .div(tf.scalar(255.0))  // Normalize to [0,1]
+          .expandDims();          // Add batch dimension
+          
+        // Make prediction
+        console.log("Running model prediction...");
+        const result = await model.predict(tensor);
+        // Get array from tensor
+        const probabilities = await result.data();
+        
+        console.log("Raw probabilities:", probabilities);
+        
+        // Format predictions to match the expected structure
+        const predictions = Array.from(probabilities).map((prob, i) => ({
+          className: CLASS_NAMES[i],
+          probability: prob
+        }));
+        
+        console.log("Formatted predictions for", inputImage.name, ":", predictions);
+
+        // Clean up tensors
+        tensor.dispose();
+        result.dispose();
 
         const resultDiv = document.createElement("div");
         resultDiv.innerHTML = `<b>Prediction for ${inputImage.name}:</b><br>`;
 
-        // Keep predictions intact - just sort them by probability
-        // We want to preserve the exact class names that are coming from the model
+        // Sort predictions by probability (highest first)
         const sortedPredictions = [...predictions].sort((a, b) => b.probability - a.probability);
 
         // Create progress bars for each prediction
@@ -230,12 +250,12 @@ async function processImage(inputImage) {
 
           // Create a class name for the progress bar
           let colorClass = "";
-          if (className.includes("nevi") || className.includes("melanocytic")) colorClass = "melanocytic";
+          if (className.includes("nevus")) colorClass = "melanocytic";
           else if (className.includes("melanoma")) colorClass = "melanoma";
           else if (className.includes("dermatofib")) colorClass = "dermatofib";
           else if (className.includes("actinic")) colorClass = "actinic";
           else if (className.includes("basal")) colorClass = "basal";
-          else if (className.includes("benign") || className.includes("keratosis") || className.includes("uncancerous")) colorClass = "benign";
+          else if (className.includes("benign") || className.includes("keratosis")) colorClass = "benign";
           else if (className.includes("vascular")) colorClass = "vascular";
           else if (className.includes("squamous")) colorClass = "melanoma"; // Red for dangerous
           else colorClass = "common"; // Default
@@ -405,7 +425,7 @@ async function generateCancerAdvice() {
      Although data is difficult to receive on the exact stages of melanoma and other types of cancer (Stages 1-5), this app will be able to see how far your cancer has progressed in various areas based on the AI model's confidence. If it is 100 percent sure your skin has cancer, then it has almost certainly progressed much more than if it is 10% sure. It will also be able to tell if the cancer is malignant or benign. You can also take pictures of your skin consistently, which will allow you to measure your progression more clearly and get an even better picture of your current position. 
 
     Rough Prediction of Stage/Progression of Cancer
-    Attempt to use the data provided, including confidence percentages in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potiential life altering decisions, and should only be used for casual advice."
+    Attempt to use the data provided, including confidence percentages in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potential life altering decisions, and should only be used for casual advice."
      IMPORTANT INSTRUCTIONS:
      1. Start your response with the heading "Skin Cancer Analysis and Recommendations"
      2. Refer to yourself as "assistant" not "AI"
