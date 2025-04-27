@@ -26,37 +26,52 @@ document.addEventListener("DOMContentLoaded", function () {
   const previewContainer = document.getElementById("preview-container");
   const uploadArea = document.getElementById("upload-area");
 
-  // Handle file selection
+  // Make sure upload area is clickable
+  uploadArea.addEventListener("click", function() {
+    inputElement.click();
+  });
+  
+  // Handle file selection via input element
   inputElement.addEventListener("change", function (e) {
     const files = e.target.files;
     handleFiles(files);
   });
 
-  // Handle drag and drop
+  // Handle drag and drop events
   uploadArea.addEventListener("dragover", function (e) {
     e.preventDefault();
+    e.stopPropagation();
     uploadArea.style.backgroundColor = "#e8f5e9";
+    uploadArea.classList.add("drag-over");
   });
 
   uploadArea.addEventListener("dragleave", function (e) {
     e.preventDefault();
+    e.stopPropagation();
     uploadArea.style.backgroundColor = "#f9fff9";
+    uploadArea.classList.remove("drag-over");
   });
 
   uploadArea.addEventListener("drop", function (e) {
     e.preventDefault();
+    e.stopPropagation();
     uploadArea.style.backgroundColor = "#f9fff9";
+    uploadArea.classList.remove("drag-over");
+    
+    console.log("Files dropped:", e.dataTransfer.files.length);
     const files = e.dataTransfer.files;
     handleFiles(files);
   });
 
   // Function to handle selected files
   function handleFiles(files) {
+    console.log("Handling files:", files.length);
     // Filter for image files only
     const imageFiles = Array.from(files).filter((file) =>
       file.type.startsWith("image/")
     );
 
+    console.log("Image files filtered:", imageFiles.length);
     if (imageFiles.length === 0) {
       alert("Please select image files only (JPG, JPEG, PNG, GIF, WEBP).");
       return;
@@ -95,6 +110,20 @@ document.addEventListener("DOMContentLoaded", function () {
       reader.readAsDataURL(file);
     });
   }
+
+  // Add handler for document-level drag and drop
+  document.body.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  
+  document.body.addEventListener('drop', function(e) {
+    // Only prevent default if not dropping on the upload area
+    if (e.target !== uploadArea && !uploadArea.contains(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 });
 
 // Main function to process skin images
