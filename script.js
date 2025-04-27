@@ -7,70 +7,43 @@ const processedImages = new Set();
 // Store selected files
 let selectedFiles = [];
 
-// These are the exact class names from your PyTorch model based on diagnosis_mapping
-const CLASS_NAMES = [
-  "pigmented benign keratosis",
-  "nevus",
-  "melanoma",
-  "basal cell carcinoma",
-  "squamous cell carcinoma",
-  "vascular lesion",
-  "dermatofibroma",
-  "actinic keratosis"
-];
-
 // Initialize file upload and preview functionality
 document.addEventListener("DOMContentLoaded", function () {
   const inputElement = document.getElementById("input-images");
   const previewContainer = document.getElementById("preview-container");
   const uploadArea = document.getElementById("upload-area");
 
-  // Make sure upload area is clickable
-  uploadArea.addEventListener("click", function() {
-    inputElement.click();
-  });
-  
-  // Handle file selection via input element
+  // Handle file selection
   inputElement.addEventListener("change", function (e) {
     const files = e.target.files;
     handleFiles(files);
   });
 
-  // Handle drag and drop events
+  // Handle drag and drop
   uploadArea.addEventListener("dragover", function (e) {
     e.preventDefault();
-    e.stopPropagation();
     uploadArea.style.backgroundColor = "#e8f5e9";
-    uploadArea.classList.add("drag-over");
   });
 
   uploadArea.addEventListener("dragleave", function (e) {
     e.preventDefault();
-    e.stopPropagation();
     uploadArea.style.backgroundColor = "#f9fff9";
-    uploadArea.classList.remove("drag-over");
   });
 
   uploadArea.addEventListener("drop", function (e) {
     e.preventDefault();
-    e.stopPropagation();
     uploadArea.style.backgroundColor = "#f9fff9";
-    uploadArea.classList.remove("drag-over");
-    
-    console.log("Files dropped:", e.dataTransfer.files.length);
     const files = e.dataTransfer.files;
     handleFiles(files);
   });
 
   // Function to handle selected files
   function handleFiles(files) {
-    console.log("Handling files:", files.length);
     // Filter for image files only
     const imageFiles = Array.from(files).filter((file) =>
       file.type.startsWith("image/")
     );
 
-    console.log("Image files filtered:", imageFiles.length);
     if (imageFiles.length === 0) {
       alert("Please select image files only (JPG, JPEG, PNG, GIF, WEBP).");
       return;
@@ -109,32 +82,13 @@ document.addEventListener("DOMContentLoaded", function () {
       reader.readAsDataURL(file);
     });
   }
-
-  // Add handler for document-level drag and drop
-  document.body.addEventListener('dragover', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-  });
-  
-  document.body.addEventListener('drop', function(e) {
-    // Only prevent default if not dropping on the upload area
-    if (e.target !== uploadArea && !uploadArea.contains(e.target)) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
 });
 
 // Main function to process skin images
 window.skinsave = async function () {
   if (!model) {
-    console.log("Model not loaded, attempting to load it now...");
-    await loadModel();
-    
-    if (!model) {
-      alert("Unable to load the model. Please try again later.");
-      return;
-    }
+    alert("Model is still loading, please wait.");
+    return;
   }
 
   if (selectedFiles.length === 0) {
@@ -162,26 +116,22 @@ window.skinsave = async function () {
   generateCancerAdvice();
 };
 
-// Load the model
+// Load the model from Teachable Machine directly
 async function loadModel() {
+  const modelURL =
+    "https://teachablemachine.withgoogle.com/models/6WAstz5bw/model.json";
+  const metadataURL =
+    "https://teachablemachine.withgoogle.com/models/6WAstz5bw/metadata.json";
+
+  console.log("Loading model from:", modelURL);
+  console.log("Loading metadata from:", metadataURL);
+
   try {
-    console.log("Loading model from local model.json/");
-    
-    // Use tf.loadLayersModel to load the local model
-    model = await tf.loadLayersModel('model.json');
-    
-    console.log("Model loaded successfully!");
-    
-    // Get model details
-    console.log("Model summary:", model.summary());
-    
-    return true;
+    model = await tmImage.load(modelURL, metadataURL);
+    console.log("Model loaded successfully.");
   } catch (error) {
-    console.error("Error loading local model:", error);
-    
-    // Show a detailed error about the model loading failure
-    alert(`Error loading model: ${error.message}. Please make sure you have a model.json file`);
-    return false;
+    console.error("Error loading model:", error);
+    alert("There was an error loading the model. Please try again later.");
   }
 }
 
@@ -207,57 +157,31 @@ async function processImage(inputImage) {
   return new Promise((resolve) => {
     imageElement.onload = async () => {
       console.log("Image loaded:", inputImage.name);
-      
-      try {
-        // Preprocess the image to match PyTorch model's expected input
-        const tensor = tf.browser.fromPixels(imageElement)
-          .resizeNearestNeighbor([224, 224]) // Resize to match model input
-          .toFloat()
-          .div(tf.scalar(255.0))  // Normalize to [0,1]
-          .expandDims();          // Add batch dimension
-          
-        // Make prediction
-        console.log("Running model prediction...");
-        const result = await model.predict(tensor);
-        // Get array from tensor
-        const probabilities = await result.data();
-        
-        console.log("Raw probabilities:", probabilities);
-        
-        // Format predictions to match the expected structure
-        const predictions = Array.from(probabilities).map((prob, i) => ({
-          className: CLASS_NAMES[i],
-          probability: prob
-        }));
-        
-        console.log("Formatted predictions for", inputImage.name, ":", predictions);
+      const imageTensor = preprocessImage(imageElement);
 
-        // Clean up tensors
-        tensor.dispose();
-        result.dispose();
+      try {
+        const predictions = await model.predict(imageElement);
+        console.log("Predictions for", inputImage.name, ":", predictions);
 
         const resultDiv = document.createElement("div");
         resultDiv.innerHTML = `<b>Prediction for ${inputImage.name}:</b><br>`;
 
-        // Sort predictions by probability (highest first)
-        const sortedPredictions = [...predictions].sort((a, b) => b.probability - a.probability);
-
         // Create progress bars for each prediction
-        sortedPredictions.forEach((pred) => {
-          // Round to 1 decimal place
+        predictions.forEach((pred) => {
+          // Round to 1 decimal place instead of 4
           const probabilityPercentage = (pred.probability * 100).toFixed(1);
           const className = pred.className.toLowerCase().replace(/\s+/g, "-");
 
           // Create a class name for the progress bar
           let colorClass = "";
-          if (className.includes("nevus")) colorClass = "melanocytic";
+          if (className.includes("melanocytic")) colorClass = "melanocytic";
           else if (className.includes("melanoma")) colorClass = "melanoma";
           else if (className.includes("dermatofib")) colorClass = "dermatofib";
           else if (className.includes("actinic")) colorClass = "actinic";
           else if (className.includes("basal")) colorClass = "basal";
-          else if (className.includes("benign") || className.includes("keratosis")) colorClass = "benign";
+          else if (className.includes("benign")) colorClass = "benign";
           else if (className.includes("vascular")) colorClass = "vascular";
-          else if (className.includes("squamous")) colorClass = "melanoma"; // Red for dangerous
+          else if (className.includes("common")) colorClass = "common";
           else colorClass = "common"; // Default
 
           // Create progress bar HTML
@@ -279,104 +203,58 @@ async function processImage(inputImage) {
           resultDiv.innerHTML += progressHTML;
         });
 
-        // Store predictions for Groq API in a more consistent format
         imagePredictions.push({
           imageName: inputImage.name,
-          predictions: sortedPredictions.map(pred => ({
-            className: pred.className,
-            probability: (pred.probability * 100).toFixed(1)
-          }))
+          predictions,
         });
-        
         resultContainer.appendChild(resultDiv);
         document.getElementById("output").appendChild(resultContainer);
         resolve();
       } catch (error) {
         console.error("Error predicting image:", error);
-        // Add error message to the UI
-        const errorDiv = document.createElement("div");
-        errorDiv.className = "error-message";
-        errorDiv.innerHTML = `<p>Error analyzing this image: ${error.message}</p>`;
-        resultContainer.appendChild(errorDiv);
-        document.getElementById("output").appendChild(resultContainer);
         resolve();
       }
-    };
-    
-    // Handle image loading errors
-    imageElement.onerror = function() {
-      console.error("Error loading image:", inputImage.name);
-      const errorDiv = document.createElement("div");
-      errorDiv.className = "error-message";
-      errorDiv.innerHTML = `<p>Error loading image: ${inputImage.name}</p>`;
-      document.getElementById("output").appendChild(errorDiv);
-      resolve();
     };
   });
 }
 
-// Direct API call to Groq
+// Preprocess image before making predictions
+function preprocessImage(imageElement) {
+  const image = tf.browser.fromPixels(imageElement);
+  const resizedImage = tf.image.resizeBilinear(image, [224, 224]);
+  const normalizedImage = resizedImage.div(tf.scalar(255.0));
+  const batchedImage = normalizedImage.expandDims(0);
+  return batchedImage;
+}
+
+// Direct API call to Groq (fallback method)
 async function callGroqAPI(messages) {
-  try {
-    const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GROQ_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "deepseek-r1-distill-llama-70b",
-          messages: messages,
-          temperature: 0.6,
-          max_tokens: 4096,
-          top_p: 0.95,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        `API error: ${response.status} - ${JSON.stringify(errorData)}`
-      );
+  const response = await fetch(
+    "https://api.groq.com/openai/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "deepseek-r1-distill-llama-70b",
+        messages: messages,
+        temperature: 0.6,
+        max_tokens: 4096,
+        top_p: 0.95,
+      }),
     }
+  );
 
-    return await response.json();
-  } catch (error) {
-    console.error("Groq API call failed:", error);
-    // Fallback response for when API fails
-    return {
-      choices: [
-        {
-          message: {
-            content: `Skin Cancer Analysis and Recommendations
-
-1. TREATMENT OPTIONS AND ADVICE:
-- Based on the analysis, please consult a dermatologist immediately
-- Monitor the affected areas and document any changes
-- Apply sunscreen with SPF 50+ when outdoors
-- Consider topical treatments as recommended by a specialist
-
-2. CANCER SPREAD PREDICTION:
-- The confidence levels suggest limited spread at this time
-- Monitor surrounding skin areas for any changes
-- Take photos regularly to track any progression
-- Pay special attention to areas with higher melanoma probability
-
-3. CANCER PROGRESSION ASSESSMENT:
-- Current predictions suggest early-stage development
-- The lesions appear to show characteristics of both benign and potentially malignant conditions
-- A follow-up examination is recommended within 1-2 months
-- With early intervention, prognosis is generally favorable
-
-This prediction should not be used for potential life altering decisions, and should only be used for casual advice.`
-          }
-        }
-      ]
-    };
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      `API error: ${response.status} - ${JSON.stringify(errorData)}`
+    );
   }
+
+  return await response.json();
 }
 
 // Generate cancer advice using Groq AI
@@ -419,13 +297,13 @@ async function generateCancerAdvice() {
      This app will use an AI chatbot in order to give advice. For instance, it could tell you which doctor to go to for your specific cancer and for the cheapest price depending on your insurance. It can also tell you which possible outcomes are the most dangerous, as well as lifestyle changes that will help decrease the progression rate of your cancer. 
 
      Prediction of where cancer will spread next
-     By getting information on multiple parts of the skin, this app will allow for a world-class analysis of where the cancer might spread next. For instance, if one area is predicted with 100% confidence to be cancerous, and the other areas have 66% and 36%, for example, it can give you advice on where it will spread and where it may metastasize to. This advice will help you get the correct treatment the first time without a long sequence of expensive doctors' visits and appointments. 
+     By getting information on multiple parts of the skin, this app will allow for a world-class analysis of where the cancer might spread next. For instance, if one area is predicted with 100% confidence to be cancerous, and the other areas have 66% and 36%, for example, it can give you advice on where it will spread and where it may metastasize to. This advice will help you get the correct treatment the first time without a long sequence of expensive doctors’ visits and appointments. 
 
      Exact progression of your cancer
-     Although data is difficult to receive on the exact stages of melanoma and other types of cancer (Stages 1-5), this app will be able to see how far your cancer has progressed in various areas based on the AI model's confidence. If it is 100 percent sure your skin has cancer, then it has almost certainly progressed much more than if it is 10% sure. It will also be able to tell if the cancer is malignant or benign. You can also take pictures of your skin consistently, which will allow you to measure your progression more clearly and get an even better picture of your current position. 
+     Although data is difficult to receive on the exact stages of melanoma and other types of cancer (Stages 1-5), this app will be able to see how far your cancer has progressed in various areas based on the AI model’s confidence. If it is 100 percent sure your skin has cancer, then it has almost certainly progressed much more than if it is 10% sure. It will also be able to tell if the cancer is malignant or benign. You can also take pictures of your skin consistently, which will allow you to measure your progression more clearly and get an even better picture of your current position. 
 
     Rough Prediction of Stage/Progression of Cancer
-    Attempt to use the data provided, including confidence percentages in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potential life altering decisions, and should only be used for casual advice."
+    Attempt to use the data provided, including confidence percentages in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potiential life altering decisions, and should only be used for casual advice."
      IMPORTANT INSTRUCTIONS:
      1. Start your response with the heading "Skin Cancer Analysis and Recommendations"
      2. Refer to yourself as "assistant" not "AI"
@@ -596,26 +474,13 @@ function formatProfessionalResponse(text) {
 
 // Load the model when the page is ready
 window.onload = async () => {
-  console.log("Page loaded, loading model...");
-  
-  // Create groq-data div if it doesn't exist
-  if (!document.getElementById("groq-data")) {
-    const dataDiv = document.createElement("div");
-    dataDiv.id = "groq-data";
-    dataDiv.style.display = "none";
-    document.body.appendChild(dataDiv);
-  }
-  
-  // Load the model
   await loadModel();
-  
-  // Check for Groq SDK
   console.log("Checking Groq SDK availability...");
+
+  // Test if Groq SDK is available
   if (typeof Groq === "undefined") {
-    console.warn("Groq SDK not detected. Will use direct API calls.");
+    console.warn("Groq SDK not detected. Will use direct API calls instead.");
   } else {
     console.log("Groq SDK loaded successfully.");
   }
-  
-  console.log("Initialization complete!");
 };
