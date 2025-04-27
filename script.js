@@ -8,14 +8,14 @@ const processedImages = new Set();
 let selectedFiles = [];
 // Class mapping for skin conditions
 const classMapping = {
-  "0": "Actinic Keratoses",
-  "1": "Basal Cell Carcinoma",
-  "2": "Benign Keratosis",
-  "3": "Dermatofibroma",
-  "4": "Melanoma",
-  "5": "Melanocytic Nevus",
-  "6": "Vascular Lesion",
-  "7": "Squamous Cell Carcinoma"
+  "0": 'pigmented benign keratosis',
+  "1": 'nevus',
+  "2": 'melanoma',
+  "3": 'basal cell carcinoma',
+  "4": 'squamous cell carcinoma',
+  "5":  'vascular lesion',
+  "6": 'dermatofibroma',
+  "7":   'actinic keratosis'
 };
 
 // Initialize file upload and preview functionality
