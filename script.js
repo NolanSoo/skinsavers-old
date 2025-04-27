@@ -1,6 +1,5 @@
 // Define variables in global scope
-let model;
-let session; // ONNX Session
+let session; // ONNX Runtime Web Session
 let imagePredictions = []; // Array to store predictions from each image
 const GROQ_API_KEY = "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"; // will figure out env variables later
 // Track processed images to prevent duplicates
@@ -98,12 +97,17 @@ async function loadModel() {
     classMapping = await mappingResponse.json();
     console.log("Class mapping loaded:", classMapping);
     
-    // Create ONNX session
+    // Initialize ONNX Runtime Web
     console.log("Loading ONNX model...");
-    session = new onnx.InferenceSession();
     
-    // Load the model
-    await session.loadModel("skin_cancer_model.onnx");
+    // Set ONNX Runtime Web options
+    const options = {
+      executionProviders: ['wasm'],
+      graphOptimizationLevel: 'all'
+    };
+    
+    // Create session and load model
+    session = await ort.InferenceSession.create('./skin_cancer_model.onnx', options);
     console.log("ONNX model loaded successfully");
   } catch (error) {
     console.error("Error loading model or class mapping:", error);
@@ -120,34 +124,47 @@ function isCancer(conditionName) {
 
 // Preprocess image for ONNX model
 async function preprocessImage(imageElement) {
-  // Convert the image to a tensor using TensorFlow.js temporarily
-  const image = tf.browser.fromPixels(imageElement);
-  
-  // Resize to 224x224 (the size used by the model)
-  const resizedImage = tf.image.resizeBilinear(image, [224, 224]);
-  
-  // Normalize the values to be between 0 and 1
-  const normalizedImage = resizedImage.div(tf.scalar(255.0));
-  
-  // Normalize using the specific mean and std values for ImageNet
-  // This matches the Python normalization:
-  // transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-  const meanImageNet = tf.tensor([0.485, 0.456, 0.406]);
-  const stdImageNet = tf.tensor([0.229, 0.224, 0.225]);
-  
-  const normalizedImageNet = normalizedImage.sub(meanImageNet).div(stdImageNet);
-  
-  // Get the data in the correct format for ONNX
-  // Convert from NHWC to NCHW format (batch, channels, height, width)
-  const transposedImage = normalizedImageNet.transpose([2, 0, 1]).expandDims(0);
-  
-  // Convert to Float32Array for ONNX
-  const imageData = await transposedImage.data();
-  
-  // Clean up tensors
-  tf.dispose([image, resizedImage, normalizedImage, normalizedImageNet, transposedImage]);
-  
-  return new Float32Array(imageData);
+  return new Promise((resolve) => {
+    // Create canvas to resize and normalize the image
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Set dimensions
+    const width = 224;
+    const height = 224;
+    canvas.width = width;
+    canvas.height = height;
+    
+    // Draw and resize image to canvas
+    ctx.drawImage(imageElement, 0, 0, width, height);
+    
+    // Get image data
+    const imageData = ctx.getImageData(0, 0, width, height).data;
+    
+    // Prepare the input tensor data (NCHW format - batch, channels, height, width)
+    const inputTensor = new Float32Array(1 * 3 * height * width);
+    
+    // Mean and std values for normalization (ImageNet)
+    const mean = [0.485, 0.456, 0.406];
+    const std = [0.229, 0.224, 0.225];
+    
+    // Process the image pixels
+    let inputIndex = 0;
+    
+    // For NCHW layout: process one channel at a time
+    for (let c = 0; c < 3; c++) {
+      for (let h = 0; h < height; h++) {
+        for (let w = 0; w < width; w++) {
+          const pixelIndex = (h * width + w) * 4; // RGBA has 4 channels
+          // Normalize using ImageNet mean and std
+          const pixelValue = imageData[pixelIndex + c] / 255.0;
+          inputTensor[inputIndex++] = (pixelValue - mean[c]) / std[c];
+        }
+      }
+    }
+    
+    resolve(inputTensor);
+  });
 }
 
 // Main function to process skin images
@@ -210,16 +227,17 @@ async function processImage(inputImage) {
         const imageData = await preprocessImage(imageElement);
         
         // Create ONNX tensor
-        const inputTensor = new onnx.Tensor(imageData, 'float32', [1, 3, 224, 224]);
+        const inputTensor = new ort.Tensor('float32', imageData, [1, 3, 224, 224]);
         
-        // Create the feeds object for ONNX
-        const feeds = { input: inputTensor };
+        // Prepare feeds with the right input name
+        const feeds = {};
+        feeds[session.inputNames[0]] = inputTensor;
         
         // Run inference
-        const outputMap = await session.run(feeds);
+        const results = await session.run(feeds);
         
-        // Get output data - the first (and likely only) output tensor
-        const outputTensor = outputMap[Object.keys(outputMap)[0]];
+        // Get output data
+        const outputTensor = results[session.outputNames[0]];
         const outputData = outputTensor.data;
         
         // Apply softmax to convert logits to probabilities
