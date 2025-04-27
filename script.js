@@ -7,16 +7,17 @@ const processedImages = new Set();
 // Store selected files
 let selectedFiles = [];
 
-// Mapping from actual model output classes to our standardized disease names
+// Mapping from actual model output classes to simplified display names
+// Keep this exact case and format as shown in your example
 const classNameMapping = {
-  "Actinic keratoses and intraepithelial carcinoma /": "actinic keratosis",
-  "dermatofib": "dermatofibroma",
-  "vascular lesions": "vascular lesion",
-  "common-uncancerous": "pigmented benign keratosis",
-  "melanocytic nevi": "nevus",
-  "basal cell carcinoma": "basal cell carcinoma",
+  "melanocytic nevi": "melanocytic nevi",
   "melanoma": "melanoma",
-  "benign keratosis-like lesions": "pigmented benign keratosis",
+  "Actinic keratoses and intraepithelial carcinoma /": "Actinic keratoses and intraepithelial carcinoma /",
+  "vascular lesions": "vascular lesions",
+  "dermatofib": "dermatofib",
+  "basal cell carcinoma": "basal cell carcinoma",
+  "common-uncancerous": "common-uncancerous",
+  "benign keratosis-like lesions": "benign keratosis-like lesions",
   "squamous cell carcinoma": "squamous cell carcinoma"
 };
 
@@ -176,26 +177,7 @@ async function loadModel() {
     );
     
     console.log("Model loaded successfully!");
-    
-    // Log the actual class labels from the model
-    const modelLabels = model.getClassLabels();
-    console.log("Model classes:", modelLabels);
-    
-    // Update our class mapping based on actual model labels if needed
-    if (modelLabels && modelLabels.length > 0) {
-      console.log("Using model's actual class labels for mapping");
-      
-      // Log the first few predictions to understand the format
-      const testImg = document.createElement('img');
-      testImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
-      document.body.appendChild(testImg);
-      testImg.style.display = 'none';
-      
-      // No need to make actual predictions, just checking the class format
-      testImg.onload = () => {
-        document.body.removeChild(testImg);
-      };
-    }
+    console.log("Model classes:", model.getClassLabels());
     
     return true;
   } catch (error) {
@@ -236,26 +218,15 @@ async function processImage(inputImage) {
         const resultDiv = document.createElement("div");
         resultDiv.innerHTML = `<b>Prediction for ${inputImage.name}:</b><br>`;
 
-        // Keep the original predictions but add mapped names for the API
-        const mappedPredictions = predictions.map(pred => {
-          // Use the class name as is for display, but add mapped name for consistency
-          const mappedClassName = classNameMapping[pred.className] || pred.className;
-          return {
-            originalClassName: pred.className,
-            className: mappedClassName, // Store standardized name
-            displayName: pred.className, // Keep original for display
-            probability: pred.probability
-          };
-        });
-
-        // Sort predictions by probability (highest first)
-        mappedPredictions.sort((a, b) => b.probability - a.probability);
+        // Keep predictions intact - just sort them by probability
+        // We want to preserve the exact class names that are coming from the model
+        const sortedPredictions = [...predictions].sort((a, b) => b.probability - a.probability);
 
         // Create progress bars for each prediction
-        mappedPredictions.forEach((pred) => {
+        sortedPredictions.forEach((pred) => {
           // Round to 1 decimal place
           const probabilityPercentage = (pred.probability * 100).toFixed(1);
-          const className = pred.displayName.toLowerCase().replace(/\s+/g, "-");
+          const className = pred.className.toLowerCase().replace(/\s+/g, "-");
 
           // Create a class name for the progress bar
           let colorClass = "";
@@ -273,7 +244,7 @@ async function processImage(inputImage) {
           const progressHTML = `
              <div class="progress-container">
                <div class="progress-label">
-                 <span>${pred.displayName}</span>
+                 <span>${pred.className}</span>
                  <span>${probabilityPercentage}%</span>
                </div>
                <div class="progress-bar">
@@ -288,12 +259,11 @@ async function processImage(inputImage) {
           resultDiv.innerHTML += progressHTML;
         });
 
-        // Store predictions for Groq API in a more consistent format using mapped class names
+        // Store predictions for Groq API in a more consistent format
         imagePredictions.push({
           imageName: inputImage.name,
-          predictions: mappedPredictions.map(pred => ({
-            className: pred.className, // Use standardized name for API
-            originalClassName: pred.displayName, // Include original name for reference
+          predictions: sortedPredictions.map(pred => ({
+            className: pred.className,
             probability: (pred.probability * 100).toFixed(1)
           }))
         });
