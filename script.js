@@ -457,4 +457,131 @@ async function generateCancerAdvice() {
     }
 
     // Remove loading indicator
-    document.getElementById("output").removeChild(loading
+    document.getElementById("output").removeChild(loadingDiv);
+
+    console.log("Analysis response received");
+
+    // Trim the response to start with the heading
+    aiResponse = trimResponseToHeading(aiResponse);
+
+    // Format the response with professional styling
+    const formattedResponse = formatProfessionalResponse(aiResponse);
+
+    const resultContainer = document.createElement("div");
+    resultContainer.classList.add("chat-output");
+    resultContainer.innerHTML = formattedResponse;
+    document.getElementById("output").appendChild(resultContainer);
+
+    // Add disclaimer at the bottom
+    const disclaimer = document.createElement("div");
+    disclaimer.className = "disclaimer";
+    disclaimer.innerHTML =
+      "Disclaimer: This analysis is for informational purposes only and does not constitute medical advice. Always consult with a qualified healthcare provider for diagnosis and treatment.";
+    document.getElementById("output").appendChild(disclaimer);
+  } catch (error) {
+    console.error("Error with analysis:", error);
+
+    const errorContainer = document.createElement("div");
+    errorContainer.classList.add("chat-output");
+    errorContainer.style.backgroundColor = "#ffebee";
+    errorContainer.innerHTML = `
+       <h3>Error in Analysis:</h3>
+       <p>Sorry, there was an error processing your request. Please try again later.</p>
+       <p>Error details: ${error.message}</p>
+     `;
+    document.getElementById("output").appendChild(errorContainer);
+  }
+}
+
+// Trim the response to start with the heading
+function trimResponseToHeading(text) {
+  const headingPattern = /Skin Cancer Analysis and Recommendations/i;
+  const match = text.match(headingPattern);
+
+  if (match) {
+    // Return only the text starting from the heading
+    return text.substring(match.index);
+  }
+
+  return text; // Return original if heading not found
+}
+
+// Format the response in a professional, clinical manner
+function formatProfessionalResponse(text) {
+  // Replace the main heading with a styled heading
+  text = text.replace(
+    /Skin Cancer Analysis and Recommendations/i,
+    '<h1 class="analysis-header">Skin Cancer Analysis and Recommendations</h1>'
+  );
+
+  // Replace section headers with styled headers
+  text = text.replace(
+    /1\.\s+TREATMENT OPTIONS AND ADVICE:/gi,
+    '<div class="analysis-section"><h2>1. Treatment Options and Advice</h2>'
+  );
+  text = text.replace(
+    /2\.\s+CANCER SPREAD PREDICTION:/gi,
+    '</div><div class="analysis-section"><h2>2. Cancer Spread Prediction</h2>'
+  );
+  text = text.replace(
+    /3\.\s+CANCER PROGRESSION ASSESSMENT:/gi,
+    '</div><div class="analysis-section"><h2>3. Cancer Progression Assessment</h2>'
+  );
+
+  // Add closing div for the last section
+  text += "</div>";
+
+  // Format bullet points
+  text = text.replace(/- /g, "<li>");
+  text = text.replace(/\n- /g, "</li>\n<li>");
+  text = text.replace(/<li>(.*?)(?=<\/li>|$)/gs, "<li>$1</li>");
+
+  // Wrap bullet point sections in ul tags
+  text = text.replace(/(<li>.*?<\/li>)/gs, "<ul>$1</ul>");
+
+  // Format conclusion if present
+  text = text.replace(
+    /Conclusion:(.*?)(?=<div|$)/gs,
+    '<div class="conclusion"><strong>Conclusion:</strong>$1</div>'
+  );
+
+  // Replace any remaining # symbols in headings
+  text = text.replace(
+    /#{1,6}\s+(.*?)(?=\n|$)/g,
+    '<div class="subheading">$1</div>'
+  );
+
+  // Bold important terms and subheadings
+  text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+  // Format paragraphs
+  text = text.replace(/\n\n/g, "</p><p>");
+
+  return text;
+}
+
+// Load the model when the page is ready
+window.onload = async () => {
+  console.log("Page loaded, loading model...");
+  
+  // Create groq-data div if it doesn't exist
+  if (!document.getElementById("groq-data")) {
+    const dataDiv = document.createElement("div");
+    dataDiv.id = "groq-data";
+    dataDiv.style.display = "none";
+    document.body.appendChild(dataDiv);
+  }
+  
+  // Load the model
+  await loadModel();
+  
+  // Check for Groq SDK
+  console.log("Checking Groq SDK availability...");
+  if (typeof Groq === "undefined") {
+    console.warn("Groq SDK not detected. Will use direct API calls.");
+  } else {
+    console.log("Groq SDK loaded successfully.");
+  }
+  
+  console.log("Initialization complete!");
+};
