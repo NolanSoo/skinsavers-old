@@ -267,12 +267,15 @@ window.skinsave = async function () {
         await processImage(inputImage, bodyPart);
     }
 
-    // Include body part information in the groq-data element
-    const groqData = imagePredictions.map((prediction, index) => ({
-        ...prediction,
-        bodyPart: bodyPartSelections[index],
-    }));
-    document.getElementById("groq-data").textContent = JSON.stringify(groqData);
+
+    document.getElementById("groq-data").textContent = JSON.stringify(
+        imagePredictions.map((prediction, index) => ({
+            ...prediction,
+            bodyPart: bodyPartSelections[index], // Add body part information
+        }))
+    );
+
+    
 
     // Update loading status for AI analysis
     updateLoadingProgress(70, "Generating comprehensive analysis...");
@@ -510,7 +513,17 @@ async function generateCancerAdvice() {
 
     Rough Prediction of Stage/Progression of Cancer
     Attempt to use the data provided, including confidence percentages in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potiential life altering decisions, and should only be used for casual advice."
-     IMPORTANT INSTRUCTIONS:
+ 
+
+** Predictions Data **: 
+${ JSON.stringify(predictionData, null, 2) }
+
+Each prediction includes the associated body part for better context.Use this information to provide more accurate advice, such as identifying high - risk areas or predicting cancer spread patterns.
+
+Please use the location information for each image to provide more accurate advice, such as identifying high-risk areas or predicting cancer spread patterns.
+
+
+    IMPORTANT INSTRUCTIONS:
      1. Start your response with the heading "Skin Cancer Analysis and Recommendations"
      2. Refer to yourself as "assistant" not "AI"
      3. Format your response in a professional, clinical manner with clear sections and bullet points
