@@ -219,49 +219,71 @@ async function preprocessImage(imageElement) {
 
 // Main function to process skin images
 window.skinsave = async function () {
-  if (!session) {
-    alert("Model is still loading, please wait.");
-    return;
-  }
+    if (!session) {
+        alert("Model is still loading, please wait.");
+        return;
+    }
 
-  if (selectedFiles.length === 0) {
-    alert("Please select at least one image.");
-    return;
-  }
+    if (selectedFiles.length === 0) {
+        alert("Please select at least one image.");
+        return;
+    }
 
-  showLoadingScreen("Preparing for analysis...");
-  updateLoadingProgress(10);
-  
-  console.log("Processing images...");
-  // Clear previous output and reset predictions
-  document.getElementById("output").innerHTML = "";
-  imagePredictions = [];
-  // Clear the processed images set
-  processedImages.clear();
+    showLoadingScreen("Preparing for analysis...");
+    updateLoadingProgress(10);
 
-  // Process each selected image
-  const totalImages = selectedFiles.length;
-  for (let i = 0; i < totalImages; i++) {
-    const inputImage = selectedFiles[i];
-    const progressPercent = 10 + Math.round((i / totalImages) * 60); // Progress from 10% to 70%
-    updateLoadingProgress(progressPercent, `Analyzing image ${i+1} of ${totalImages}: ${inputImage.name}`);
-    console.log("Processing image:", inputImage.name);
-    await processImage(inputImage);
-  }
+    console.log("Processing images...");
+    // Clear previous output and reset predictions
+    document.getElementById("output").innerHTML = "";
+    imagePredictions = [];
+    processedImages.clear();
 
-  // After processing images, store predictions in the invisible div
-  document.getElementById("groq-data").textContent =
-    JSON.stringify(imagePredictions);
-    
-  // Update loading status for AI analysis
-  updateLoadingProgress(70, "Generating comprehensive analysis...");
-  
-  // Trigger Groq AI function
-  await generateCancerAdvice();
-  
-  // Hide loading screen when everything is complete
-  hideLoadingScreen();
+    // Collect body part information
+    const bodyPartSelections = [];
+    const previewContainer = document.getElementById("preview-container");
+    const imageContainers = previewContainer.getElementsByClassName("image-container");
+
+    Array.from(imageContainers).forEach((container, index) => {
+        const dropdown = container.querySelector(".body-part-dropdown");
+        const bodyPart = dropdown ? dropdown.value : null;
+
+        if (!bodyPart) {
+            alert(`Please select a body part for image ${index + 1}.`);
+            hideLoadingScreen();
+            throw new Error("Body part selection missing.");
+        }
+
+        bodyPartSelections.push(bodyPart);
+    });
+
+    // Process each selected image
+    const totalImages = selectedFiles.length;
+    for (let i = 0; i < totalImages; i++) {
+        const inputImage = selectedFiles[i];
+        const bodyPart = bodyPartSelections[i];
+        const progressPercent = 10 + Math.round((i / totalImages) * 60); // Progress from 10% to 70%
+        updateLoadingProgress(progressPercent, `Analyzing image ${i + 1} of ${totalImages}: ${inputImage.name}`);
+        console.log(`Processing image: ${inputImage.name}, Body Part: ${bodyPart}`);
+        await processImage(inputImage, bodyPart);
+    }
+
+    // Include body part information in the groq-data element
+    const groqData = imagePredictions.map((prediction, index) => ({
+        ...prediction,
+        bodyPart: bodyPartSelections[index],
+    }));
+    document.getElementById("groq-data").textContent = JSON.stringify(groqData);
+
+    // Update loading status for AI analysis
+    updateLoadingProgress(70, "Generating comprehensive analysis...");
+
+    // Trigger Groq AI function
+    await generateCancerAdvice();
+
+    // Hide loading screen when everything is complete
+    hideLoadingScreen();
 };
+
 
 // Function to process each image and display predictions
 async function processImage(inputImage) {
