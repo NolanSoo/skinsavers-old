@@ -8,6 +8,25 @@ const processedImages = new Set();
 let selectedFiles = [];
 // Store class mappings
 let classMapping = {};
+// Store body area selections
+let bodyAreaSelections = {};
+
+// Define body area options
+const bodyAreaOptions = [
+  "Face",
+  "Scalp",
+  "Neck",
+  "Chest",
+  "Back",
+  "Abdomen",
+  "Arms",
+  "Hands",
+  "Legs",
+  "Feet",
+  "Genitals",
+  "Buttocks",
+  "Other"
+];
 
 // Loading screen functions
 function showLoadingScreen(message = "Initializing...") {
@@ -48,6 +67,11 @@ document.addEventListener("DOMContentLoaded", function () {
   const inputElement = document.getElementById("input-images");
   const previewContainer = document.getElementById("preview-container");
   const uploadArea = document.getElementById("upload-area");
+  const bodyAreaContainer = document.getElementById("body-area-container");
+  const bodyAreaSection = document.getElementById("body-area-section");
+  
+  // Initially hide the body area section until images are uploaded
+  bodyAreaSection.style.display = "none";
 
   // Handle file selection
   inputElement.addEventListener("change", function (e) {
@@ -87,7 +111,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Clear previous previews
     previewContainer.innerHTML = "";
+    bodyAreaContainer.innerHTML = "";
     selectedFiles = imageFiles;
+    bodyAreaSelections = {};
 
     // Create previews for each image
     imageFiles.forEach((file, index) => {
@@ -108,15 +134,91 @@ document.addEventListener("DOMContentLoaded", function () {
           // Remove this file from selectedFiles
           selectedFiles = selectedFiles.filter((_, i) => i !== index);
           previewDiv.remove();
+          
+          // Remove corresponding body area selection
+          const bodyAreaItem = document.getElementById(`body-area-item-${file.name.replace(/[^a-zA-Z0-9]/g, '_')}`);
+          if (bodyAreaItem) {
+            bodyAreaItem.remove();
+          }
+          delete bodyAreaSelections[file.name];
+          
+          // Hide body area section if no images
+          if (selectedFiles.length === 0) {
+            bodyAreaSection.style.display = "none";
+          }
         });
 
         previewDiv.appendChild(img);
         previewDiv.appendChild(removeBtn);
         previewContainer.appendChild(previewDiv);
+        
+        // Create body area selection for this image
+        createBodyAreaSelection(file, e.target.result);
       };
 
       reader.readAsDataURL(file);
     });
+    
+    // Show body area section if images are uploaded
+    if (imageFiles.length > 0) {
+      bodyAreaSection.style.display = "block";
+    }
+  }
+  
+  // Function to create body area selection for an image
+  function createBodyAreaSelection(file, imgSrc) {
+    const fileId = file.name.replace(/[^a-zA-Z0-9]/g, '_');
+    const bodyAreaItem = document.createElement("div");
+    bodyAreaItem.className = "body-area-item";
+    bodyAreaItem.id = `body-area-item-${fileId}`;
+    
+    // Create thumbnail
+    const thumbnail = document.createElement("img");
+    thumbnail.src = imgSrc;
+    thumbnail.className = "body-area-thumbnail";
+    
+    // Create details container
+    const detailsDiv = document.createElement("div");
+    detailsDiv.className = "body-area-details";
+    
+    // Add filename
+    const filenameDiv = document.createElement("div");
+    filenameDiv.className = "body-area-filename";
+    filenameDiv.textContent = file.name;
+    
+    // Create select dropdown
+    const select = document.createElement("select");
+    select.className = "body-area-select";
+    select.id = `body-area-select-${fileId}`;
+    
+    // Add default option
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = "-- Select Body Area --";
+    defaultOption.selected = true;
+    select.appendChild(defaultOption);
+    
+    // Add body area options
+    bodyAreaOptions.forEach(area => {
+      const option = document.createElement("option");
+      option.value = area;
+      option.textContent = area;
+      select.appendChild(option);
+    });
+    
+    // Add change event listener
+    select.addEventListener("change", function() {
+      bodyAreaSelections[file.name] = this.value;
+    });
+    
+    // Assemble the item
+    detailsDiv.appendChild(filenameDiv);
+    detailsDiv.appendChild(select);
+    bodyAreaItem.appendChild(thumbnail);
+    bodyAreaItem.appendChild(detailsDiv);
+    
+    // Add to container
+    bodyAreaContainer.appendChild(bodyAreaItem);
   }
 });
 
@@ -219,74 +321,56 @@ async function preprocessImage(imageElement) {
 
 // Main function to process skin images
 window.skinsave = async function () {
-    if (!session) {
-        alert("Model is still loading, please wait.");
-        return;
-    }
+  if (!session) {
+    alert("Model is still loading, please wait.");
+    return;
+  }
 
-    if (selectedFiles.length === 0) {
-        alert("Please select at least one image.");
-        return;
-    }
+  if (selectedFiles.length === 0) {
+    alert("Please select at least one image.");
+    return;
+  }
 
-    showLoadingScreen("Preparing for analysis...");
-    updateLoadingProgress(10);
+  // Check if body areas are selected for all images
+  const unselectedImages = selectedFiles.filter(file => !bodyAreaSelections[file.name] || bodyAreaSelections[file.name] === "");
+  if (unselectedImages.length > 0) {
+    alert("Please select body areas for all images before analysis.");
+    return;
+  }
 
-    console.log("Processing images...");
-    // Clear previous output and reset predictions
-    document.getElementById("output").innerHTML = "";
-    imagePredictions = [];
-    processedImages.clear();
+  showLoadingScreen("Preparing for analysis...");
+  updateLoadingProgress(10);
+  
+  console.log("Processing images...");
+  // Clear previous output and reset predictions
+  document.getElementById("output").innerHTML = "";
+  imagePredictions = [];
+  // Clear the processed images set
+  processedImages.clear();
 
-    // Collect body part information
-    const bodyPartSelections = [];
-    const previewContainer = document.getElementById("preview-container");
-    const imageContainers = previewContainer.getElementsByClassName("image-container");
+  // Process each selected image
+  const totalImages = selectedFiles.length;
+  for (let i = 0; i < totalImages; i++) {
+    const inputImage = selectedFiles[i];
+    const progressPercent = 10 + Math.round((i / totalImages) * 60); // Progress from 10% to 70%
+    updateLoadingProgress(progressPercent, `Analyzing image ${i+1} of ${totalImages}: ${inputImage.name}`);
+    console.log("Processing image:", inputImage.name);
+    await processImage(inputImage);
+  }
 
-    Array.from(imageContainers).forEach((container, index) => {
-        const dropdown = container.querySelector(".body-part-dropdown");
-        const bodyPart = dropdown ? dropdown.value : null;
-
-        if (!bodyPart) {
-            alert(`Please select a body part for image ${index + 1}.`);
-            hideLoadingScreen();
-            throw new Error("Body part selection missing.");
-        }
-
-        bodyPartSelections.push(bodyPart);
-    });
-
-    // Process each selected image
-    const totalImages = selectedFiles.length;
-    for (let i = 0; i < totalImages; i++) {
-        const inputImage = selectedFiles[i];
-        const bodyPart = bodyPartSelections[i];
-        const progressPercent = 10 + Math.round((i / totalImages) * 60); // Progress from 10% to 70%
-        updateLoadingProgress(progressPercent, `Analyzing image ${i + 1} of ${totalImages}: ${inputImage.name}`);
-        console.log(`Processing image: ${inputImage.name}, Body Part: ${bodyPart}`);
-        await processImage(inputImage, bodyPart);
-    }
-
-
-    document.getElementById("groq-data").textContent = JSON.stringify(
-        imagePredictions.map((prediction, index) => ({
-            ...prediction,
-            bodyPart: bodyPartSelections[index], // Add body part information
-        }))
-    );
-
+  // After processing images, store predictions in the invisible div
+  document.getElementById("groq-data").textContent =
+    JSON.stringify(imagePredictions);
     
-
-    // Update loading status for AI analysis
-    updateLoadingProgress(70, "Generating comprehensive analysis...");
-
-    // Trigger Groq AI function
-    await generateCancerAdvice();
-
-    // Hide loading screen when everything is complete
-    hideLoadingScreen();
+  // Update loading status for AI analysis
+  updateLoadingProgress(70, "Generating comprehensive analysis...");
+  
+  // Trigger Groq AI function
+  await generateCancerAdvice();
+  
+  // Hide loading screen when everything is complete
+  hideLoadingScreen();
 };
-
 
 // Function to process each image and display predictions
 async function processImage(inputImage) {
@@ -358,7 +442,7 @@ async function processImage(inputImage) {
         console.log("Predictions for", inputImage.name, ":", formattedPredictions);
 
         const resultDiv = document.createElement("div");
-        resultDiv.innerHTML = `<b>Prediction for ${inputImage.name}:</b><br>`;
+        resultDiv.innerHTML = `<b>Prediction for ${inputImage.name} (${bodyAreaSelections[inputImage.name]}):</b><br>`;
 
         // Create progress bars for each prediction (showing top 5)
         formattedPredictions.slice(0, 5).forEach((pred) => {
@@ -404,8 +488,10 @@ async function processImage(inputImage) {
           </div>
         `;
 
+        // Add body area information to the prediction data
         imagePredictions.push({
           imageName: inputImage.name,
+          bodyArea: bodyAreaSelections[inputImage.name],
           predictions: formattedPredictions,
           cancerRisk: cancerRisk
         });
@@ -487,18 +573,21 @@ async function generateCancerAdvice() {
      - Explain potential outcomes and their severity
      - Suggest lifestyle changes that could help slow progression
      - Recommend specific medical specialists to consult
+     - Consider the specific body areas affected when providing treatment advice
 
      2. CANCER SPREAD PREDICTION:
      - Analyze the confidence levels across different skin areas
-     - Predict potential spread patterns based on the current data
+     - Predict potential spread patterns based on the current data and body locations
      - Identify high-risk areas that should be monitored closely
-     - Explain how the spread might occur based on the type of cancer detected
+     - Explain how the spread might occur based on the type of cancer detected and the body areas involved
+     - Consider the anatomical proximity of the affected body areas in your analysis
 
      3. CANCER PROGRESSION ASSESSMENT:
-     - Estimate the current stage of progression based on confidence levels
+     - Estimate the current stage of progression based on confidence levels and body areas
      - Determine if the cancer appears malignant or benign
      - Suggest a monitoring schedule for tracking progression
      - Explain how the progression might change over time
+     - Consider how the specific body locations might affect progression rates
 
      Be specific, detailed, and provide actionable advice. Include both immediate next steps and long-term recommendations.
      Use these descriptions for each section:
@@ -512,18 +601,8 @@ async function generateCancerAdvice() {
      Although data is difficult to receive on the exact stages of melanoma and other types of cancer (Stages 1-5), this app will be able to see how far your cancer has progressed in various areas based on the AI model's confidence. If it is 100 percent sure your skin has cancer, then it has almost certainly progressed much more than if it is 10% sure. It will also be able to tell if the cancer is malignant or benign. You can also take pictures of your skin consistently, which will allow you to measure your progression more clearly and get an even better picture of your current position. 
 
     Rough Prediction of Stage/Progression of Cancer
-    Attempt to use the data provided, including confidence percentages in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potiential life altering decisions, and should only be used for casual advice."
- 
-
-** Predictions Data **: 
-${ JSON.stringify(predictionData, null, 2) }
-
-Each prediction includes the associated body part for better context.Use this information to provide more accurate advice, such as identifying high - risk areas or predicting cancer spread patterns.
-
-Please use the location information for each image to provide more accurate advice, such as identifying high-risk areas or predicting cancer spread patterns.
-
-
-    IMPORTANT INSTRUCTIONS:
+    Attempt to use the data provided, including confidence percentages and body area information in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potential life altering decisions, and should only be used for casual advice."
+     IMPORTANT INSTRUCTIONS:
      1. Start your response with the heading "Skin Cancer Analysis and Recommendations"
      2. Refer to yourself as "assistant" not "AI"
      3. Format your response in a professional, clinical manner with clear sections and bullet points
@@ -532,6 +611,7 @@ Please use the location information for each image to provide more accurate advi
      6. Do not say things like "the user wants" or "based on your request" - just provide the direct analysis
      7. DO NOT use any # symbols in headings or subheadings (like "#### Long-Term Recommendations")
      8. For subheadings, just use bold text without any # symbols
+     9. Specifically reference the body areas in your analysis and how they relate to treatment, spread, and progression
    `;
 
   // Create messages array for the API
