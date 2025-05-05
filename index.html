@@ -39,7 +39,21 @@
               </div>
           </div>
       </div>
-
+      <div>
+          <label for="theme-selector">Choose Theme:</label>
+          <select id="theme-selector">
+              <option value="">Light</option>
+              <option value="dark">Dark</option>
+              <option value="red">Red</option>
+              <option value="orange">Orange</option>
+              <option value="yellow">Yellow</option>
+              <option value="green">Green</option>
+              <option value="blue">Blue</option>
+              <option value="purple">Purple</option>
+              <option value="pink">Pink</option>
+              <option value="rainbow">Rainbow</option>
+          </select>
+      </div>
       <h1 class="logo" text-align="center"><b>skinsavers</b></h1>
       <h5 class="text">
           Welcome to Skinsavers! This app allows you to quickly self-diagnose
@@ -90,17 +104,17 @@
                       dropdown.name = `body-part-${index}`;
                       dropdown.classList.add('body-part-dropdown');
                       dropdown.innerHTML = `
-                <option value="" disabled selected>Select Body Part</option>
-                <option value="head">Head</option>
-                <option value="neck">Neck</option>
-                <option value="chest">Chest</option>
-                <option value="back">Back</option>
-                <option value="arm">Arm</option>
-                <option value="leg">Leg</option>
-                <option value="hand">Hand</option>
-                <option value="foot">Foot</option>
-                <option value="other">Other</option>
-              `;
+                      <option value="" disabled selected>Select Body Part</option>
+                      <option value="head">Head</option>
+                      <option value="neck">Neck</option>
+                      <option value="chest">Chest</option>
+                      <option value="back">Back</option>
+                      <option value="arm">Arm</option>
+                      <option value="leg">Leg</option>
+                      <option value="hand">Hand</option>
+                      <option value="foot">Foot</option>
+                      <option value="other">Other</option>
+                    `;
 
                       // Append the image and dropdown to the container
                       imageContainer.appendChild(img);

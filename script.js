@@ -8,6 +8,14 @@ const processedImages = new Set();
 let selectedFiles = [];
 // Store class mappings
 let classMapping = {};
+function switchTheme(theme) {
+    document.documentElement.className = theme; // Set the theme class on the root element
+}
+
+// Example: Add event listeners for theme buttons
+document.getElementById("theme-selector").addEventListener("change", (event) => {
+    switchTheme(event.target.value);
+});
 
 // Loading screen functions
 function showLoadingScreen(message = "Initializing...") {
