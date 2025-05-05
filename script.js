@@ -8,16 +8,6 @@ const processedImages = new Set();
 let selectedFiles = [];
 // Store class mappings
 let classMapping = {};
-<<<<<<< HEAD
-function switchTheme(theme) {
-    document.documentElement.className = theme; // Set the theme class on the root element
-}
-
-// Example: Add event listeners for theme buttons
-document.getElementById("theme-selector").addEventListener("change", (event) => {
-    switchTheme(event.target.value);
-});
-=======
 // Store body area selections
 let bodyAreaSelections = {};
 
@@ -37,7 +27,6 @@ const bodyAreaOptions = [
   "Buttocks",
   "Other"
 ];
->>>>>>> 28dec221ffe13777308179cb624ec747639d76e9
 
 // Loading screen functions
 function showLoadingScreen(message = "Initializing...") {
