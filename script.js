@@ -10,6 +10,8 @@ let selectedFiles = [];
 let classMapping = {};
 // Store body area selections
 let bodyAreaSelections = {};
+// Store photo dates
+let photoDates = {};
 
 // Define body area options
 const bodyAreaOptions = [
@@ -27,6 +29,12 @@ const bodyAreaOptions = [
   "Buttocks",
   "Other"
 ];
+
+// Theme functions
+function changeTheme(theme) {
+  document.body.className = `theme-${theme}`;
+  localStorage.setItem('skinsavers-theme', theme);
+}
 
 // Loading screen functions
 function showLoadingScreen(message = "Initializing...") {
@@ -64,6 +72,13 @@ function hideLoadingScreen() {
 
 // Initialize file upload and preview functionality
 document.addEventListener("DOMContentLoaded", function () {
+  // Load saved theme if exists
+  const savedTheme = localStorage.getItem('skinsavers-theme');
+  if (savedTheme) {
+    document.body.className = `theme-${savedTheme}`;
+    document.getElementById('theme-select').value = savedTheme;
+  }
+  
   const inputElement = document.getElementById("input-images");
   const previewContainer = document.getElementById("preview-container");
   const uploadArea = document.getElementById("upload-area");
@@ -114,6 +129,7 @@ document.addEventListener("DOMContentLoaded", function () {
     bodyAreaContainer.innerHTML = "";
     selectedFiles = imageFiles;
     bodyAreaSelections = {};
+    photoDates = {};
 
     // Create previews for each image
     imageFiles.forEach((file, index) => {
@@ -141,6 +157,7 @@ document.addEventListener("DOMContentLoaded", function () {
             bodyAreaItem.remove();
           }
           delete bodyAreaSelections[file.name];
+          delete photoDates[file.name];
           
           // Hide body area section if no images
           if (selectedFiles.length === 0) {
@@ -211,9 +228,35 @@ document.addEventListener("DOMContentLoaded", function () {
       bodyAreaSelections[file.name] = this.value;
     });
     
+    // Create date label
+    const dateLabel = document.createElement("label");
+    dateLabel.className = "date-label";
+    dateLabel.textContent = "Photo Date (optional):";
+    
+    // Create date input
+    const dateInput = document.createElement("input");
+    dateInput.type = "date";
+    dateInput.className = "body-area-date";
+    dateInput.id = `body-area-date-${fileId}`;
+    
+    // Set default date to today
+    const today = new Date();
+    const formattedDate = today.toISOString().split('T')[0];
+    dateInput.value = formattedDate;
+    
+    // Add change event listener for date
+    dateInput.addEventListener("change", function() {
+      photoDates[file.name] = this.value;
+    });
+    
+    // Initialize the date in our storage
+    photoDates[file.name] = formattedDate;
+    
     // Assemble the item
     detailsDiv.appendChild(filenameDiv);
     detailsDiv.appendChild(select);
+    detailsDiv.appendChild(dateLabel);
+    detailsDiv.appendChild(dateInput);
     bodyAreaItem.appendChild(thumbnail);
     bodyAreaItem.appendChild(detailsDiv);
     
@@ -441,8 +484,11 @@ async function processImage(inputImage) {
         
         console.log("Predictions for", inputImage.name, ":", formattedPredictions);
 
+        // Get the date for this image (if available)
+        const photoDate = photoDates[inputImage.name] || "Not specified";
+        
         const resultDiv = document.createElement("div");
-        resultDiv.innerHTML = `<b>Prediction for ${inputImage.name} (${bodyAreaSelections[inputImage.name]}):</b><br>`;
+        resultDiv.innerHTML = `<b>Prediction for ${inputImage.name} (${bodyAreaSelections[inputImage.name]}, Date: ${photoDate}):</b><br>`;
 
         // Create progress bars for each prediction (showing top 5)
         formattedPredictions.slice(0, 5).forEach((pred) => {
@@ -488,10 +534,11 @@ async function processImage(inputImage) {
           </div>
         `;
 
-        // Add body area information to the prediction data
+        // Add body area and date information to the prediction data
         imagePredictions.push({
           imageName: inputImage.name,
           bodyArea: bodyAreaSelections[inputImage.name],
+          photoDate: photoDates[inputImage.name] || null,
           predictions: formattedPredictions,
           cancerRisk: cancerRisk
         });
@@ -581,6 +628,7 @@ async function generateCancerAdvice() {
      - Identify high-risk areas that should be monitored closely
      - Explain how the spread might occur based on the type of cancer detected and the body areas involved
      - Consider the anatomical proximity of the affected body areas in your analysis
+     - If photo dates are provided, analyze progression over time
 
      3. CANCER PROGRESSION ASSESSMENT:
      - Estimate the current stage of progression based on confidence levels and body areas
@@ -588,6 +636,7 @@ async function generateCancerAdvice() {
      - Suggest a monitoring schedule for tracking progression
      - Explain how the progression might change over time
      - Consider how the specific body locations might affect progression rates
+     - If photo dates are provided, use this information to assess the rate of progression
 
      Be specific, detailed, and provide actionable advice. Include both immediate next steps and long-term recommendations.
      Use these descriptions for each section:
@@ -601,7 +650,7 @@ async function generateCancerAdvice() {
      Although data is difficult to receive on the exact stages of melanoma and other types of cancer (Stages 1-5), this app will be able to see how far your cancer has progressed in various areas based on the AI model's confidence. If it is 100 percent sure your skin has cancer, then it has almost certainly progressed much more than if it is 10% sure. It will also be able to tell if the cancer is malignant or benign. You can also take pictures of your skin consistently, which will allow you to measure your progression more clearly and get an even better picture of your current position. 
 
     Rough Prediction of Stage/Progression of Cancer
-    Attempt to use the data provided, including confidence percentages and body area information in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potential life altering decisions, and should only be used for casual advice."
+    Attempt to use the data provided, including confidence percentages, body area information, and photo dates (if available) in order to predict the stage, type, and progression of the cancer overall. Try to predict a timeline of how the next few years may be like (including estimated time to progress further or become treated completely with different lifestyle/treatment decisions), and how treatment can change that timeline for the better for cheap. Add the exact disclaimer: "This prediction should not be used for potential life altering decisions, and should only be used for casual advice."
      IMPORTANT INSTRUCTIONS:
      1. Start your response with the heading "Skin Cancer Analysis and Recommendations"
      2. Refer to yourself as "assistant" not "AI"
@@ -612,6 +661,7 @@ async function generateCancerAdvice() {
      7. DO NOT use any # symbols in headings or subheadings (like "#### Long-Term Recommendations")
      8. For subheadings, just use bold text without any # symbols
      9. Specifically reference the body areas in your analysis and how they relate to treatment, spread, and progression
+     10. If photo dates are provided, analyze how the condition may have changed over time
    `;
 
   // Create messages array for the API
@@ -740,47 +790,32 @@ function formatProfessionalResponse(text) {
     '</div><div class="analysis-section"><h2>3. Cancer Progression Assessment</h2>'
   );
 
-  // Add closing div for the last section
-  text += "</div>";
+    // Add closing div for the last section
+  text += '</div>';
+
+  // Format bold text for subheadings
+  text = text.replace(/\*\*(.*?)\*\*/g, '<div class="subheading">$1</div>');
 
   // Format bullet points
-  text = text.replace(/- /g, "<li>");
-  text = text.replace(/\n- /g, "</li>\n<li>");
-  text = text.replace(/<li>(.*?)(?=<\/li>|$)/gs, "<li>$1</li>");
+  text = text.replace(/- (.*?)(?=\n|$)/g, '<li>$1</li>');
+  text = text.replace(/<li>(.*?)<\/li>/g, function(match) {
+    if (!match.includes('<ul>')) {
+      return '<ul>' + match + '</ul>';
+    }
+    return match;
+  });
 
-  // Wrap bullet point sections in ul tags
-  text = text.replace(/(<li>.*?<\/li>)/gs, "<ul>$1</ul>");
+  // Fix any duplicate <ul> tags
+  text = text.replace(/<\/ul>\s*<ul>/g, '');
 
-  // Format conclusion if present
+  // Format the conclusion section
   text = text.replace(
-    /Conclusion:(.*?)(?=<div|$)/gs,
-    '<div class="conclusion"><strong>Conclusion:</strong>$1</div>'
+    /This prediction should not be used for potential life altering decisions, and should only be used for casual advice\./g,
+    '<div class="conclusion">This prediction should not be used for potential life altering decisions, and should only be used for casual advice.</div>'
   );
-
-  // Replace any remaining # symbols in headings
-  text = text.replace(
-    /#{1,6}\s+(.*?)(?=\n|$)/g,
-    '<div class="subheading">$1</div>'
-  );
-
-  // Bold important terms and subheadings
-  text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-
-  // Format paragraphs
-  text = text.replace(/\n\n/g, "</p><p>");
 
   return text;
 }
 
-// Load the model when the page is ready
-window.onload = async () => {
-  await loadModel();
-  console.log("Checking Groq SDK availability...");
-
-  // Test if Groq SDK is available
-  if (typeof Groq === "undefined") {
-    console.warn("Groq SDK not detected. Will use direct API calls instead.");
-  } else {
-    console.log("Groq SDK loaded successfully.");
-  }
-};
+// Initialize the model when the page loads
+window.addEventListener("load", loadModel);
