@@ -35,19 +35,61 @@
 
 /* Rainbow Theme */
 .theme-rainbow {
-  --bg-color: #f5f5f5;
+  --bg-color: #f8f9fa;
   --text-color: #333333;
-  --accent-color: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff);
-  --accent-hover: linear-gradient(90deg, #e60000, #e67300, #e6e600, #00e600, #0000e6, #440075, #7a00e6);
-  --accent-light: #f0f0f0;
-  --accent-border: #ccc;
+  --accent-color: #ff6b6b;
+  --accent-hover: #ff8080;
+  --accent-light: #fff0f0;
+  --accent-border: #ffcccc;
   --card-bg: #ffffff;
-  --card-border: #ddd;
+  --card-border: #e0e0e0;
   --progress-bg: #e0e0e0;
   --cancer-color: #ff5252;
   --benign-color: #4db6ac;
   --shadow-color: rgba(0, 0, 0, 0.1);
-  --overlay-bg: rgba(245, 245, 245, 0.95);
+  --overlay-bg: rgba(248, 249, 250, 0.95);
+}
+
+/* Rainbow theme special elements */
+.theme-rainbow h1 {
+  background: linear-gradient(to right, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.theme-rainbow .loading-text,
+.theme-rainbow .subheading,
+.theme-rainbow .body-area-section h3,
+.theme-rainbow .analysis-header {
+  background: linear-gradient(to right, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.theme-rainbow .heartbeat {
+  stroke: url(#rainbow-gradient);
+}
+
+.theme-rainbow .progress-fill.benign {
+  background: linear-gradient(to right, #00ff00, #00ffff);
+}
+
+.theme-rainbow .progress-fill.melanoma {
+  background: linear-gradient(to right, #ff0000, #ff00ff);
+}
+
+.theme-rainbow #input {
+  background: linear-gradient(to right, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff);
+}
+
+.theme-rainbow #input:hover {
+  opacity: 0.9;
+}
+
+.theme-rainbow .body-area-section {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 
 /* Red Theme */
