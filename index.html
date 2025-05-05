@@ -19,7 +19,25 @@
     />
     <title>SkinSavers</title>
   </head>
-  <body>
+  <body class="theme-light">
+    <!-- Theme Selector -->
+    <div class="theme-selector">
+      <label for="theme-select">Theme:</label>
+      <select id="theme-select" onchange="changeTheme(this.value)">
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="rainbow">Rainbow</option>
+        <option value="red">Red</option>
+        <option value="orange">Orange</option>
+        <option value="yellow">Yellow</option>
+        <option value="green">Green</option>
+        <option value="blue">Blue</option>
+        <option value="magenta">Magenta</option>
+        <option value="purple">Purple</option>
+        <option value="brown">Brown</option>
+      </select>
+    </div>
+
     <!-- Loading Screen Overlay -->
     <div id="loading-overlay" class="loading-overlay">
       <div class="loading-content">
@@ -65,8 +83,8 @@
 
       <!-- Body Area Selection Section -->
       <div id="body-area-section" class="body-area-section">
-        <h3>Specify Body Areas for Your Images</h3>
-        <p class="body-area-info">For more accurate analysis, please specify which body area each image is from:</p>
+        <h3>Specify Details for Your Images</h3>
+        <p class="body-area-info">For more accurate analysis, please provide information about each image:</p>
         <div id="body-area-container" class="body-area-container">
           <!-- Body area selections will be added here dynamically -->
         </div>
