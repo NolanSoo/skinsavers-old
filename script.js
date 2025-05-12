@@ -65,6 +65,198 @@ function updateLoadingProgress(percent, message = null) {
   }
 }
 
+// Add these helper functions at the top of your script.js
+
+// Function to download and validate the ONNX model
+async function validateAndGetModelData(url) {
+  try {
+    // Fetch the model as an ArrayBuffer
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch model: ${response.status} ${response.statusText}`);
+    }
+    
+    // Get the model as an ArrayBuffer
+    const modelData = await response.arrayBuffer();
+    
+    // Check if it has the ONNX magic number
+    const headerView = new Uint8Array(modelData, 0, 4);
+    const magicNumber = String.fromCharCode(...headerView);
+    
+    // ONNX files start with "ONNX"
+    const isValid = magicNumber === "ONNX" || modelData.byteLength > 100000; // Basic size check as fallback
+    
+    return {
+      isValid,
+      data: modelData,
+      size: modelData.byteLength,
+      url: url
+    };
+  } catch (error) {
+    console.error(`Error validating model at ${url}:`, error);
+    return {
+      isValid: false,
+      error: error.message,
+      url: url
+    };
+  }
+}
+
+// Updated loadModel function
+async function loadModel() {
+  try {
+    showLoadingScreen("Loading model resources...");
+    updateLoadingProgress(10, "Loading class mapping...");
+    
+    // Load class mapping from class_mapping.json
+    const mappingResponse = await fetch("class_mapping.json");
+    if (!mappingResponse.ok) {
+      throw new Error(`Failed to load class mapping: ${mappingResponse.status}`);
+    }
+    classMapping = await mappingResponse.json();
+    console.log("Class mapping loaded:", classMapping);
+    
+    updateLoadingProgress(30, "Initializing ONNX runtime...");
+    
+    // Set ONNX WebAssembly path and other options
+    const ort = window.ort;
+    
+    // Fix 'exports not defined' issue by ensuring ort.env exists
+    if (!ort.env) {
+      console.warn("ort.env not found, creating it");
+      ort.env = {};
+    }
+    
+    if (!ort.env.wasm) {
+      console.warn("ort.env.wasm not found, creating it");
+      ort.env.wasm = {};
+    }
+    
+    ort.env.wasm.wasmPaths = {
+      'ort-wasm.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort-wasm.wasm',
+      'ort-wasm-simd.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort-wasm-simd.wasm',
+      'ort-wasm-threaded.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort-wasm-threaded.wasm',
+      'ort-wasm-simd-threaded.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort-wasm-simd-threaded.wasm'
+    };
+    
+    // Explicitly specify version to avoid conflicts
+    console.log("Using ONNX Runtime version:", ort.version || "unknown");
+    
+    updateLoadingProgress(50, "Setting up model session...");
+    
+    // Create ONNX session options
+    const sessionOptions = {
+      executionProviders: ['wasm'],
+      graphOptimizationLevel: 'all'
+    };
+    
+    // Define potential model URLs to try
+    const potentialModelUrls = [
+      'Skin Cancer Model (1).onnx',
+      'SkinCancerModel1.onnx',
+      'skin_cancer_model.onnx',
+      'model.onnx'
+    ];
+    
+    // Try to validate each model file
+    console.log("Checking model files...");
+    updateLoadingProgress(60, "Locating valid model file...");
+    
+    let validModel = null;
+    for (const url of potentialModelUrls) {
+      console.log(`Checking model file: ${url}`);
+      const result = await validateAndGetModelData(url);
+      console.log(`Model check result for ${url}:`, result);
+      
+      if (result.isValid) {
+        validModel = result;
+        console.log(`Found valid model file: ${url}`);
+        break;
+      }
+    }
+    
+    if (!validModel) {
+      throw new Error("No valid model file found. Please check that your model is properly formatted and accessible.");
+    }
+    
+    // Create ONNX session from the valid model data
+    console.log("Loading ONNX model from validated data...");
+    updateLoadingProgress(70, "Loading skin cancer model...");
+    
+    try {
+      // Try creating session from ArrayBuffer (more reliable than URL)
+      session = await ort.InferenceSession.create(validModel.data, sessionOptions);
+      console.log("ONNX model loaded successfully from ArrayBuffer");
+    } catch (bufferError) {
+      console.error("Error loading model from ArrayBuffer:", bufferError);
+      
+      // Fall back to loading from URL
+      try {
+        session = await ort.InferenceSession.create(validModel.url, sessionOptions);
+        console.log("ONNX model loaded successfully from URL");
+      } catch (urlError) {
+        console.error("Error loading model from URL:", urlError);
+        throw new Error(`Failed to load model: ${bufferError.message}. Ensure the file is a valid ONNX model.`);
+      }
+    }
+    
+    // Print model input and output information for debugging
+    if (session) {
+      console.log("Model loaded successfully!");
+      
+      if (session.inputNames) {
+        console.log("Model input names:", session.inputNames);
+      }
+      
+      if (session.outputNames) {
+        console.log("Model output names:", session.outputNames);
+      }
+    }
+    
+    updateLoadingProgress(90, "Finalizing setup...");
+    
+    // Small delay to show completion
+    setTimeout(() => {
+      updateLoadingProgress(100, "Ready!");
+      setTimeout(() => {
+        hideLoadingScreen();
+      }, 500);
+    }, 500);
+  } catch (error) {
+    console.error("Error loading model or class mapping:", error);
+    updateLoadingProgress(100, `Error: ${error.message}`);
+    setTimeout(() => {
+      hideLoadingScreen();
+      
+      // Show a more helpful error message
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'error-container';
+      errorDiv.innerHTML = `
+        <h3>Error Loading Model</h3>
+        <p>${error.message}</p>
+        <p>Please check the following:</p>
+        <ul>
+          <li>The model file "Skin Cancer Model (1).onnx" exists in your web directory</li>
+          <li>The model is a valid ONNX file (not corrupted during upload)</li>
+          <li>Try renaming your model file to "model.onnx" (without spaces or special characters)</li>
+          <li>Check browser console (F12) for more detailed error messages</li>
+        </ul>
+      `;
+      
+      // Add to document
+      const outputDiv = document.getElementById('output');
+      if (outputDiv) {
+        outputDiv.innerHTML = '';
+        outputDiv.appendChild(errorDiv);
+      } else {
+        document.body.appendChild(errorDiv);
+      }
+      
+      alert("There was an error loading the model. See details in the page.");
+    }, 1000);
+  }
+}
+
 function hideLoadingScreen() {
   const loadingOverlay = document.getElementById("loading-overlay");
   loadingOverlay.classList.remove("active");
