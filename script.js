@@ -301,7 +301,7 @@ async function loadModel() {
     // Create ONNX session
     console.log("Loading ONNX model...");
     updateLoadingProgress(70, "Loading skin cancer model...");
-    session = await ort.InferenceSession.create('skin_cancer_model.onnx', sessionOptions);
+    session = await ort.InferenceSession.create('Skin Cancer Model (1).onnx', sessionOptions);
     
     updateLoadingProgress(90, "Finalizing setup...");
     console.log("ONNX model loaded successfully");
