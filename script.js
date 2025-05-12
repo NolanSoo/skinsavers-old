@@ -266,6 +266,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // Load the ONNX model
+// Load the ONNX model
 async function loadModel() {
   try {
     showLoadingScreen("Loading model resources...");
@@ -301,10 +302,37 @@ async function loadModel() {
     // Create ONNX session
     console.log("Loading ONNX model...");
     updateLoadingProgress(70, "Loading skin cancer model...");
-    session = await ort.InferenceSession.create('Skin Cancer Model (1).onnx', sessionOptions);
+    
+    try {
+      // First try loading with original model name (exact match)
+      session = await ort.InferenceSession.create('Skin Cancer Model (1).onnx', sessionOptions);
+      console.log("ONNX model loaded successfully");
+    } catch (modelError) {
+      console.error("Error loading model with spaces in filename:", modelError);
+      
+      // Try with URL-encoded filename as fallback
+      try {
+        const encodedFilename = encodeURIComponent('Skin Cancer Model (1).onnx');
+        console.log("Trying URL-encoded filename:", encodedFilename);
+        session = await ort.InferenceSession.create(encodedFilename, sessionOptions);
+        console.log("ONNX model loaded successfully with encoded filename");
+      } catch (encodedError) {
+        console.error("Error loading with encoded filename:", encodedError);
+        
+        // Try with no spaces as final fallback
+        try {
+          const noSpacesFilename = 'SkinCancerModel1.onnx';
+          console.log("Trying filename without spaces:", noSpacesFilename);
+          session = await ort.InferenceSession.create(noSpacesFilename, sessionOptions);
+          console.log("ONNX model loaded successfully with no spaces filename");
+        } catch (noSpacesError) {
+          console.error("Error loading with no spaces filename:", noSpacesError);
+          throw new Error(`Failed to load model: ${modelError.message}. Ensure the file exists and is a valid ONNX model.`);
+        }
+      }
+    }
     
     updateLoadingProgress(90, "Finalizing setup...");
-    console.log("ONNX model loaded successfully");
     
     // Small delay to show completion
     setTimeout(() => {
@@ -318,7 +346,7 @@ async function loadModel() {
     updateLoadingProgress(100, `Error: ${error.message}`);
     setTimeout(() => {
       hideLoadingScreen();
-      alert("There was an error loading the model. Please try again later.");
+      alert("There was an error loading the model. Please try again later.\n\nDetails: " + error.message);
     }, 1000);
   }
 }
