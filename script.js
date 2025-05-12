@@ -153,7 +153,7 @@ async function loadModel() {
     // Define potential model URLs to try
     const potentialModelUrls = [
       'Skin Cancer Model (1).onnx',
-      'SkinCancerModel1.onnx',
+      'SKin_Cancer_Model_2.onnx',
       'skin_cancer_model.onnx',
       'model.onnx'
     ];
@@ -497,14 +497,14 @@ async function loadModel() {
     
     try {
       // First try loading with original model name (exact match)
-      session = await ort.InferenceSession.create('Skin Cancer Model (1).onnx', sessionOptions);
+      session = await ort.InferenceSession.create('SKin_Cancer_Model_2.onnx', sessionOptions);
       console.log("ONNX model loaded successfully");
     } catch (modelError) {
       console.error("Error loading model with spaces in filename:", modelError);
       
       // Try with URL-encoded filename as fallback
       try {
-        const encodedFilename = encodeURIComponent('Skin Cancer Model (1).onnx');
+        const encodedFilename = encodeURIComponent('SKin_Cancer_Model_2.onnx');
         console.log("Trying URL-encoded filename:", encodedFilename);
         session = await ort.InferenceSession.create(encodedFilename, sessionOptions);
         console.log("ONNX model loaded successfully with encoded filename");
