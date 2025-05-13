@@ -12,4 +12,4 @@ JavaScript/Frontend Info:
 - ONNX Web Runtime: Allows us to use our ONNX model file (converted from PyTorch) 
 - Groq Chatbot AI API/SDK: Groq is the chatbot API we are using as our AI assistant - giving world-class analysis anywhere in the world (this website works on all devices including computers and smartphones - basically any electronic device with a camera/file system and a web browser)
 - We used complex HTML, CSS, and JS functions to build our mainline and side features.
-Another program I made: www.gradomatic.com
+Another project we made: www.gradomatic.com
