@@ -1,7 +1,7 @@
 // Define variables in global scope
 let session; // ONNX Session
 let imagePredictions = []; // Array to store predictions from each image
-const GROQ_API_KEY = "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"; // TODO: Move to env variables or secure config
+const GROQ_API_KEY = "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"; // todo: add to env variable
 // Track processed images to prevent duplicates
 const processedImages = new Set();
 // Store selected files
