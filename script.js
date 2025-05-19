@@ -266,62 +266,91 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // Load the ONNX model
+// In the loadModel function, modify the model loading section:
+
 async function loadModel() {
   try {
-    showLoadingScreen("Loading model resources...");
-    updateLoadingProgress(10, "Loading class mapping...");
-    
+    showLoadingScreen("Loading model resources...")
+    updateLoadingProgress(10, "Loading class mapping...")
+
     // Load class mapping from class_mapping.json
-    const mappingResponse = await fetch("class_mapping.json");
+    const mappingResponse = await fetch("class_mapping.json")
     if (!mappingResponse.ok) {
-      throw new Error(`Failed to load class mapping: ${mappingResponse.status}`);
+      throw new Error(`Failed to load class mapping: ${mappingResponse.status}`)
     }
-    classMapping = await mappingResponse.json();
-    console.log("Class mapping loaded:", classMapping);
-    
-    updateLoadingProgress(30, "Initializing ONNX runtime...");
-    
+    classMapping = await mappingResponse.json()
+    console.log("Class mapping loaded:", classMapping)
+
+    updateLoadingProgress(30, "Initializing ONNX runtime...")
+
     // Set ONNX WebAssembly path and other options
-    const ort = window.ort;
+    const ort = window.ort
+
+    // Fix: Use absolute paths for WASM files and add version to avoid caching issues
+    const wasmVersion = "1.16.0" // Use the specific version that works with your model
     ort.env.wasm.wasmPaths = {
-      'ort-wasm.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort-wasm.wasm',
-      'ort-wasm-simd.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort-wasm-simd.wasm',
-      'ort-wasm-threaded.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort-wasm-threaded.wasm',
-      'ort-wasm-simd-threaded.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm'
-    };
-    
-    updateLoadingProgress(50, "Setting up model session...");
-    
-    // Create ONNX session options
+      "ort-wasm.wasm": `https://cdn.jsdelivr.net/npm/onnxruntime-web@${wasmVersion}/dist/ort-wasm.wasm`,
+      "ort-wasm-simd.wasm": `https://cdn.jsdelivr.net/npm/onnxruntime-web@${wasmVersion}/dist/ort-wasm-simd.wasm`,
+      "ort-wasm-threaded.wasm": `https://cdn.jsdelivr.net/npm/onnxruntime-web@${wasmVersion}/dist/ort-wasm-threaded.wasm`,
+      "ort-wasm-simd-threaded.wasm": `https://cdn.jsdelivr.net/npm/onnxruntime-web@${wasmVersion}/dist/ort-wasm-simd-threaded.wasm`,
+    }
+
+    // Fix: Add proper WASM execution providers configuration
+    ort.env.wasm.numThreads = 4
+    ort.env.wasm.simd = true
+
+    updateLoadingProgress(50, "Setting up model session...")
+
+    // Fix: Improve session options
     const sessionOptions = {
-      executionProviders: ['wasm'],
-      graphOptimizationLevel: 'all'
-    };
-    
-    // Create ONNX session
-    console.log("Loading ONNX model...");
-    updateLoadingProgress(70, "Loading skin cancer model...");
-    session = await ort.InferenceSession.create('skin_cancer_model.onnx', sessionOptions);
-    
-    updateLoadingProgress(90, "Finalizing setup...");
-    console.log("ONNX model loaded successfully");
-    
+      executionProviders: ["wasm"],
+      graphOptimizationLevel: "all",
+      enableCpuMemArena: true,
+      executionMode: "sequential",
+    }
+
+    // Fix: Add proper error handling and logging for model loading
+    console.log("Loading ONNX model...")
+    updateLoadingProgress(70, "Loading skin cancer model...")
+
+    try {
+      // Fix: Use fetch to get the model as an ArrayBuffer first to ensure it's properly loaded
+      const modelResponse = await fetch("skin_cancer_model.onnx")
+      if (!modelResponse.ok) {
+        throw new Error(`Failed to fetch model: ${modelResponse.status}`)
+      }
+
+      const modelArrayBuffer = await modelResponse.arrayBuffer()
+      console.log("Model fetched successfully, size:", modelArrayBuffer.byteLength)
+
+      // Create session from the ArrayBuffer
+      session = await ort.InferenceSession.create(modelArrayBuffer, sessionOptions)
+      console.log("ONNX session created successfully")
+    } catch (modelError) {
+      console.error("Error creating ONNX session:", modelError)
+      throw new Error(`Failed to create ONNX session: ${modelError.message}`)
+    }
+
+    updateLoadingProgress(90, "Finalizing setup...")
+    console.log("ONNX model loaded successfully")
+
     // Small delay to show completion
     setTimeout(() => {
-      updateLoadingProgress(100, "Ready!");
+      updateLoadingProgress(100, "Ready!")
       setTimeout(() => {
-        hideLoadingScreen();
-      }, 500);
-    }, 500);
+        hideLoadingScreen()
+      }, 500)
+    }, 500)
   } catch (error) {
-    console.error("Error loading model or class mapping:", error);
-    updateLoadingProgress(100, `Error: ${error.message}`);
+    console.error("Error loading model or class mapping:", error)
+    updateLoadingProgress(100, `Error: ${error.message}`)
     setTimeout(() => {
-      hideLoadingScreen();
-      alert("There was an error loading the model. Please try again later.");
-    }, 1000);
+      hideLoadingScreen()
+      alert("There was an error loading the model. Please try again later: " + error.message)
+    }, 1000)
   }
 }
+
 
 // Function to determine if a condition is cancerous
 function isCancer(conditionName) {
