@@ -19,7 +19,7 @@ const bodyAreaOptions = [
   "Hands", "Legs", "Feet", "Genitals", "Buttocks", "Other"
 ];
 
-const MODEL_FILENAME_TO_LOAD = "model2.onnx"; // Centralized model filename
+const MODEL_FILENAME_TO_LOAD = "skin_cancer_model.onnx"; // Centralized model filename
 
 // Theme functions
 function changeTheme(theme) {
