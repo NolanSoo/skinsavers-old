@@ -1,9 +1,10 @@
 {
-  "0": "melanoma",
+  "0": "pigmented benign keratosis",
   "1": "nevus",
-  "2": "basal cell carcinoma",
-  "3": "Actinic keratoses",
-  "4": "Benign lesions of the keratosis",
-  "5": "dermatofibroma",
-  "6": "vascular lesion"
+  "2": "melanoma",
+  "3": "basal cell carcinoma",
+  "4": "squamous cell carcinoma",
+  "5": "vascular lesion",
+  "6": "dermatofibroma",
+  "7": "actinic keratosis"
 }
